@@ -228,6 +228,15 @@ fn diag_picker(
         }
     }
 
+    // sort global diagnostics by severity and then by source
+    flat_diag.sort_by(|a, b| {
+        let diag = a.diag.severity.cmp(&b.diag.severity);
+        let src = a.diag.source.cmp(&b.diag.source);
+        let loc = a.diag.range.start.cmp(&b.diag.range.start);
+
+        diag.then(src).then(loc)
+   });
+
     let styles = DiagnosticStyles {
         hint: cx.editor.theme.get("hint"),
         info: cx.editor.theme.get("info"),
