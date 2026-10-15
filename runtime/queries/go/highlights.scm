@@ -7,16 +7,10 @@
 
 (package_identifier) @namespace
 
-(parameter_declaration (identifier) @variable.parameter)
-(variadic_parameter_declaration (identifier) @variable.parameter)
-
 (const_spec
   name: (identifier) @constant)
 
-(type_spec 
-  name: (type_identifier) @constructor)
-
-(keyed_element (literal_element (identifier) @variable.other.member))
+(keyed_element . (literal_element (identifier) @variable.other.member))
 (field_declaration
   name: (field_identifier) @variable.other.member)
 
@@ -39,30 +33,54 @@
 
 (call_expression
   function: (identifier) @function.builtin
-  (#match? @function.builtin "^(append|cap|close|complex|copy|delete|imag|len|make|new|panic|print|println|real|recover)$"))
+  (#match? @function.builtin "^(append|cap|close|complex|copy|delete|imag|len|make|new|panic|print|println|real|recover|min|max|clear)$"))
 
 ; Types
 
 (type_identifier) @type
 
 (type_parameter_list
-  (parameter_declaration
+  (type_parameter_declaration
     name: (identifier) @type.parameter))
 
 ((type_identifier) @type.builtin
   (#match? @type.builtin "^(any|bool|byte|comparable|complex128|complex64|error|float32|float64|int|int16|int32|int64|int8|rune|string|uint|uint16|uint32|uint64|uint8|uintptr)$"))
+
+; Type definition names: `type Foo struct{}`, `type Bar = Baz`.
+(type_spec
+  name: (type_identifier) @type.definition)
+(type_alias
+  name: (type_identifier) @type.definition)
 
 ; Function definitions
 
 (function_declaration
   name: (identifier) @function)
 
+((function_declaration
+  name: (identifier) @function.public)
+  (#match? @function.public "^[A-Z]"))
+
 (method_declaration
   name: (field_identifier) @function.method)
 
-(method_spec 
-  name: (field_identifier) @function.method) 
+((method_declaration
+  name: (field_identifier) @function.method.public)
+  (#match? @function.method.public "^[A-Z]"))
 
+(method_elem
+  name: (field_identifier) @function.method)
+
+((method_elem
+  name: (field_identifier) @function.method.public)
+  (#match? @function.method.public "^[A-Z]"))
+
+; Blank identifier `_` (Go's discard) — dim as unused.
+; It parses as (blank_identifier) in imports and as (identifier) elsewhere
+; (`_ = x`, `a, _ := f()`, `for _, v := range`).
+(blank_identifier) @comment.unused
+((identifier) @comment.unused
+ (#eq? @comment.unused "_"))
 
 ; Operators
 
@@ -103,6 +121,8 @@
   "|"
   "|="
   "||"
+  "&^"
+  "&^="
   "~"
 ] @operator
 
@@ -114,7 +134,13 @@
 ] @keyword
 
 [
-  "if"  
+  "defer"
+  "go"
+  "goto"
+] @keyword.control
+
+[
+  "if"
   "else"
   "switch"
   "select"
@@ -154,12 +180,6 @@
   "const"
 ] @keyword.storage.modifier
 
-[
-  "defer"
-  "goto"
-  "go"
-] @function.macro
-
 ; Delimiters
 
 [
@@ -183,8 +203,9 @@
 [
   (interpreted_string_literal)
   (raw_string_literal)
-  (rune_literal)
 ] @string
+
+(rune_literal) @constant.character
 
 (escape_sequence) @constant.character.escape
 
@@ -208,30 +229,25 @@
 ] @constant.builtin
 
 ; Comments
-
 (comment) @comment
 
 ; Doc Comments
 (source_file
-  .
-  (comment)+ @comment.block.documentation)
-
-(source_file
-  (comment)+ @comment.block.documentation
-  .
-  (const_declaration))
-
-(source_file
-  (comment)+ @comment.block.documentation
-  .
-  (function_declaration))
-
-(source_file
-  (comment)+ @comment.block.documentation
-  .
-  (type_declaration))
-
-(source_file
-  (comment)+ @comment.block.documentation
-  .
-  (var_declaration))
+  (comment) @comment.block.documentation . (comment)* . [
+    (package_clause) ; `package`
+    (type_declaration) ; `type`
+    (function_declaration) ; `func`
+    (method_declaration) ; `func`
+    (var_declaration) ; `var`
+    (const_declaration) ; `const`
+    ; var (
+    ; 	A = 1
+    ; 	B = 2
+    ; )
+    (var_spec)
+    ; const (
+    ; 	A = 1
+    ; 	B = 2
+    ; )
+    (const_spec)
+  ])

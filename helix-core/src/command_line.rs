@@ -253,16 +253,22 @@ pub enum ExpansionKind {
     ///
     /// For example `%sh{echo hello}`.
     Shell,
+    /// Expand registers from the editor's state.
+    ///
+    /// For example `%reg{a}`.
+    Register,
 }
 
 impl ExpansionKind {
-    pub const VARIANTS: &'static [Self] = &[Self::Variable, Self::Unicode, Self::Shell];
+    pub const VARIANTS: &'static [Self] =
+        &[Self::Variable, Self::Unicode, Self::Shell, Self::Register];
 
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Variable => "",
             Self::Unicode => "u",
             Self::Shell => "sh",
+            Self::Register => "reg",
         }
     }
 
@@ -271,6 +277,7 @@ impl ExpansionKind {
             "" => Some(Self::Variable),
             "u" => Some(Self::Unicode),
             "sh" => Some(Self::Shell),
+            "reg" => Some(Self::Register),
             _ => None,
         }
     }
@@ -357,13 +364,22 @@ pub struct Token<'a> {
     pub is_terminated: bool,
 }
 
-impl Token<'_> {
+impl<'a> Token<'a> {
     pub fn empty_at(content_start: usize) -> Self {
         Self {
             kind: TokenKind::Unquoted,
             content_start,
             content: Cow::Borrowed(""),
             is_terminated: false,
+        }
+    }
+
+    pub fn expand(content: impl Into<Cow<'a, str>>) -> Self {
+        Self {
+            kind: TokenKind::Expand,
+            content_start: 0,
+            content: content.into(),
+            is_terminated: true,
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use helix_core::syntax::LanguageServerFeature;
+use helix_core::syntax::config::LanguageServerFeature;
 
 use crate::{
     editor::GutterType,
@@ -32,6 +32,7 @@ impl GutterType {
             GutterType::LineNumbers => line_numbers(editor, doc, view, theme, is_focused),
             GutterType::Spacer => padding(editor, doc, view, theme, is_focused),
             GutterType::Diff => diff(editor, doc, view, theme, is_focused),
+            GutterType::CodeActionHint => code_action_hint(editor, doc, view, theme, is_focused),
         }
     }
 
@@ -41,6 +42,7 @@ impl GutterType {
             GutterType::LineNumbers => line_numbers_width(view, doc),
             GutterType::Spacer => 1,
             GutterType::Diff => 1,
+            GutterType::CodeActionHint => 1,
         }
     }
 }
@@ -69,7 +71,7 @@ pub fn diagnostic<'doc>(
                 .iter()
                 .take_while(|d| {
                     d.line == line
-                        && d.provider.language_server_id().map_or(true, |id| {
+                        && d.provider.language_server_id().is_none_or(|id| {
                             doc.language_servers_with_feature(LanguageServerFeature::Diagnostics)
                                 .any(|ls| ls.id() == id)
                         })
@@ -279,13 +281,14 @@ fn execution_pause_indicator<'doc>(
 ) -> GutterFn<'doc> {
     let style = theme.get("ui.debug.active");
     let current_stack_frame = editor.current_stack_frame();
-    let frame_line = current_stack_frame.map(|frame| frame.line - 1);
+    let frame_line = current_stack_frame.map(|frame| frame.line.saturating_sub(1));
     let frame_source_path = current_stack_frame.map(|frame| {
         frame
             .source
             .as_ref()
-            .and_then(|source| source.path.as_ref())
+            .and_then(|source| source.path.as_deref())
     });
+
     let should_display_for_current_doc =
         doc.path().is_some() && frame_source_path.unwrap_or(None) == doc.path();
 
@@ -324,6 +327,30 @@ pub fn diagnostics_or_breakpoints<'doc>(
     })
 }
 
+pub fn code_action_hint<'doc>(
+    _editor: &'doc Editor,
+    doc: &'doc Document,
+    view: &View,
+    theme: &Theme,
+    is_focused: bool,
+) -> GutterFn<'doc> {
+    let style = theme.get("ui.text");
+    let text = doc.text().slice(..);
+    let show_hint = doc.code_action_hints(view.id);
+    let current_line = doc
+        .text()
+        .char_to_line(doc.selection(view.id).primary().cursor(text));
+
+    Box::new(
+        move |line: usize, _selected: bool, first_visual_line: bool, out: &mut String| {
+            (is_focused && show_hint && current_line == line && first_visual_line).then(|| {
+                write!(out, "⋮").unwrap();
+                style
+            })
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -334,7 +361,7 @@ mod tests {
     use crate::graphics::Rect;
     use crate::DocumentId;
     use arc_swap::ArcSwap;
-    use helix_core::Rope;
+    use helix_core::{syntax, Rope};
 
     #[test]
     fn test_default_gutter_widths() {
@@ -346,6 +373,7 @@ mod tests {
             rope,
             None,
             Arc::new(ArcSwap::new(Arc::new(Config::default()))),
+            Arc::new(ArcSwap::from_pointee(syntax::Loader::default())),
         );
 
         assert_eq!(view.gutters.layout.len(), 5);
@@ -371,6 +399,7 @@ mod tests {
             rope,
             None,
             Arc::new(ArcSwap::new(Arc::new(Config::default()))),
+            Arc::new(ArcSwap::from_pointee(syntax::Loader::default())),
         );
 
         assert_eq!(view.gutters.layout.len(), 1);
@@ -389,6 +418,7 @@ mod tests {
             rope,
             None,
             Arc::new(ArcSwap::new(Arc::new(Config::default()))),
+            Arc::new(ArcSwap::from_pointee(syntax::Loader::default())),
         );
 
         assert_eq!(view.gutters.layout.len(), 2);
@@ -411,6 +441,7 @@ mod tests {
             rope,
             None,
             Arc::new(ArcSwap::new(Arc::new(Config::default()))),
+            Arc::new(ArcSwap::from_pointee(syntax::Loader::default())),
         );
 
         let rope = Rope::from_str("a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np");
@@ -418,6 +449,7 @@ mod tests {
             rope,
             None,
             Arc::new(ArcSwap::new(Arc::new(Config::default()))),
+            Arc::new(ArcSwap::from_pointee(syntax::Loader::default())),
         );
 
         assert_eq!(view.gutters.layout.len(), 2);

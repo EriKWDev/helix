@@ -21,9 +21,9 @@ use bitflags::bitflags;
 
 use std::{collections::HashMap, fmt::Debug};
 
+pub use helix_stdx::Url;
 use serde::{de, de::Error as Error_, Deserialize, Serialize};
 use serde_json::Value;
-pub use url::Url;
 
 // Large enough to contain any enumeration name defined in this crate
 type PascalCaseBuf = [u8; 32];
@@ -1271,6 +1271,12 @@ impl SymbolKind {
     pub const OPERATOR: SymbolKind = SymbolKind(25);
     pub const TYPE_PARAMETER: SymbolKind = SymbolKind(26);
 }
+}
+
+impl SymbolKind {
+    pub fn all() -> Vec<Self> {
+        (1..=26).map(Self).collect()
+    }
 }
 
 /// Specific capabilities for the `SymbolKind` in the `workspace/symbol` request.
@@ -2568,9 +2574,9 @@ pub enum Documentation {
 ///
 /// The pair of a language and a value is an equivalent to markdown:
 ///
-/// ```${language}
+/// <pre><code>```${language}
 /// ${value}
-/// ```
+/// ```</code></pre>
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum MarkedString {
@@ -2850,7 +2856,9 @@ mod tests {
                 document_changes: None,
                 ..Default::default()
             },
-            r#"{"changes":{"file://test/":[]}}"#,
+            // `Url` stores the URI verbatim (RFC3986), unlike `url::Url` which
+            // would WHATWG-normalize this host-only file URL to `file://test/`.
+            r#"{"changes":{"file://test":[]}}"#,
         );
     }
 

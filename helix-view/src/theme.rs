@@ -8,32 +8,82 @@ use anyhow::{anyhow, Result};
 use helix_core::{hashmap, syntax::Highlight};
 use helix_loader::merge_toml_values;
 use log::warn;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer};
+use std::sync::LazyLock;
 use toml::{map::Map, Value};
 
 use crate::graphics::UnderlineStyle;
 pub use crate::graphics::{Color, Modifier, Style};
 
-pub static DEFAULT_THEME_DATA: Lazy<Value> = Lazy::new(|| {
+pub static DEFAULT_THEME_DATA: LazyLock<Value> = LazyLock::new(|| {
     let bytes = include_bytes!("../../theme.toml");
     toml::from_str(str::from_utf8(bytes).unwrap()).expect("Failed to parse base default theme")
 });
 
-pub static BASE16_DEFAULT_THEME_DATA: Lazy<Value> = Lazy::new(|| {
+pub static BASE16_DEFAULT_THEME_DATA: LazyLock<Value> = LazyLock::new(|| {
     let bytes = include_bytes!("../../base16_theme.toml");
     toml::from_str(str::from_utf8(bytes).unwrap()).expect("Failed to parse base 16 default theme")
 });
 
-pub static DEFAULT_THEME: Lazy<Theme> = Lazy::new(|| Theme {
+pub static DEFAULT_THEME: LazyLock<Theme> = LazyLock::new(|| Theme {
     name: "default".into(),
     ..Theme::from(DEFAULT_THEME_DATA.clone())
 });
 
-pub static BASE16_DEFAULT_THEME: Lazy<Theme> = Lazy::new(|| Theme {
+pub static BASE16_DEFAULT_THEME: LazyLock<Theme> = LazyLock::new(|| Theme {
     name: "base16_default".into(),
     ..Theme::from(BASE16_DEFAULT_THEME_DATA.clone())
 });
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Mode {
+    Dark,
+    Light,
+}
+
+#[cfg(feature = "term")]
+impl From<termina::escape::csi::ThemeMode> for Mode {
+    fn from(mode: termina::escape::csi::ThemeMode) -> Self {
+        match mode {
+            termina::escape::csi::ThemeMode::Dark => Self::Dark,
+            termina::escape::csi::ThemeMode::Light => Self::Light,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged, deny_unknown_fields, rename_all = "kebab-case")]
+pub enum Config {
+    Constant(String),
+    Adaptive {
+        light: String,
+        dark: String,
+        /// A theme to choose when the terminal did not declare either light or dark mode.
+        /// When not specified the dark theme is preferred.
+        fallback: Option<String>,
+    },
+}
+
+impl Config {
+    pub fn choose(&self, preference: Option<Mode>) -> &str {
+        match self {
+            Config::Constant(theme) => theme,
+            Config::Adaptive {
+                light,
+                dark,
+                fallback,
+            } => match preference {
+                Some(Mode::Light) => light,
+                Some(Mode::Dark) => dark,
+                None => fallback.as_ref().unwrap_or(dark),
+            },
+        }
+    }
+
+    pub fn is_adaptive(&self) -> bool {
+        matches!(self, Self::Adaptive { .. })
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Loader {
@@ -227,6 +277,10 @@ pub struct Theme {
     // tree-sitter highlight styles are stored in a Vec to optimize lookups
     scopes: Vec<String>,
     highlights: Vec<Style>,
+    /// Reverse map from scope string to its `Highlight` index. `find_highlight_exact`
+    /// is called many times per frame, so we optimize lookups.
+    scope_index: HashMap<String, Highlight>,
+    rainbow_length: usize,
 }
 
 impl From<Value> for Theme {
@@ -253,12 +307,20 @@ impl<'de> Deserialize<'de> for Theme {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn build_theme_values(
     mut values: Map<String, Value>,
-) -> (HashMap<String, Style>, Vec<String>, Vec<Style>, Vec<String>) {
+) -> (
+    HashMap<String, Style>,
+    Vec<String>,
+    Vec<Style>,
+    usize,
+    Vec<String>,
+) {
     let mut styles = HashMap::new();
     let mut scopes = Vec::new();
     let mut highlights = Vec::new();
+    let mut rainbow_length = 0;
 
     let mut warnings = Vec::new();
 
@@ -277,6 +339,27 @@ fn build_theme_values(
     styles.reserve(values.len());
     scopes.reserve(values.len());
     highlights.reserve(values.len());
+
+    for (i, style) in values
+        .remove("rainbow")
+        .and_then(|value| match palette.parse_style_array(value) {
+            Ok(styles) => Some(styles),
+            Err(err) => {
+                warnings.push(err);
+                None
+            }
+        })
+        .unwrap_or_else(default_rainbow)
+        .into_iter()
+        .enumerate()
+    {
+        let name = format!("rainbow.{i}");
+        styles.insert(name.clone(), style);
+        scopes.push(name);
+        highlights.push(style);
+        rainbow_length += 1;
+    }
+
     for (name, style_value) in values {
         let mut style = Style::default();
         if let Err(err) = palette.parse_style(&mut style, style_value) {
@@ -289,48 +372,51 @@ fn build_theme_values(
         highlights.push(style);
     }
 
-    (styles, scopes, highlights, warnings)
+    (styles, scopes, highlights, rainbow_length, warnings)
 }
 
+fn default_rainbow() -> Vec<Style> {
+    vec![
+        Style::default().fg(Color::Red),
+        Style::default().fg(Color::Yellow),
+        Style::default().fg(Color::Green),
+        Style::default().fg(Color::Blue),
+        Style::default().fg(Color::Cyan),
+        Style::default().fg(Color::Magenta),
+    ]
+}
 impl Theme {
     /// To allow `Highlight` to represent arbitrary RGB colors without turning it into an enum,
-    /// we interpret the last 3 bytes of a `Highlight` as RGB colors.
-    const RGB_START: usize = (usize::MAX << (8 + 8 + 8)) - 1;
+    /// we interpret the last 256^3 numbers as RGB.
+    const RGB_START: u32 = (u32::MAX << (8 + 8 + 8)) - 1 - (u32::MAX - Highlight::MAX);
 
     /// Interpret a Highlight with the RGB foreground
-    fn decode_rgb_highlight(rgb: usize) -> Option<(u8, u8, u8)> {
-        (rgb > Self::RGB_START).then(|| {
-            let [b, g, r, ..] = rgb.to_ne_bytes();
+    fn decode_rgb_highlight(highlight: Highlight) -> Option<(u8, u8, u8)> {
+        (highlight.get() > Self::RGB_START).then(|| {
+            let [b, g, r, ..] = (highlight.get() + 1).to_le_bytes();
             (r, g, b)
         })
     }
 
     /// Create a Highlight that represents an RGB color
     pub fn rgb_highlight(r: u8, g: u8, b: u8) -> Highlight {
-        Highlight(usize::from_ne_bytes([
-            b,
-            g,
-            r,
-            u8::MAX,
-            u8::MAX,
-            u8::MAX,
-            u8::MAX,
-            u8::MAX,
-        ]))
+        // -1 because highlight is "non-max": u32::MAX is reserved for the null pointer
+        // optimization.
+        Highlight::new(u32::from_le_bytes([b, g, r, u8::MAX]) - 1)
     }
 
     #[inline]
-    pub fn highlight(&self, index: usize) -> Style {
-        if let Some((red, green, blue)) = Self::decode_rgb_highlight(index) {
+    pub fn highlight(&self, highlight: Highlight) -> Style {
+        if let Some((red, green, blue)) = Self::decode_rgb_highlight(highlight) {
             Style::new().fg(Color::Rgb(red, green, blue))
         } else {
-            self.highlights[index]
+            self.highlights[highlight.idx()]
         }
     }
 
     #[inline]
-    pub fn scope(&self, index: usize) -> &str {
-        &self.scopes[index]
+    pub fn scope(&self, highlight: Highlight) -> &str {
+        &self.scopes[highlight.idx()]
     }
 
     pub fn name(&self) -> &str {
@@ -361,13 +447,13 @@ impl Theme {
         &self.scopes
     }
 
-    pub fn find_scope_index_exact(&self, scope: &str) -> Option<usize> {
-        self.scopes().iter().position(|s| s == scope)
+    pub fn find_highlight_exact(&self, scope: &str) -> Option<Highlight> {
+        self.scope_index.get(scope).copied()
     }
 
-    pub fn find_scope_index(&self, mut scope: &str) -> Option<usize> {
+    pub fn find_highlight(&self, mut scope: &str) -> Option<Highlight> {
         loop {
-            if let Some(highlight) = self.find_scope_index_exact(scope) {
+            if let Some(highlight) = self.find_highlight_exact(scope) {
                 return Some(highlight);
             }
             if let Some(new_end) = scope.rfind('.') {
@@ -386,6 +472,10 @@ impl Theme {
         })
     }
 
+    pub fn rainbow_length(&self) -> usize {
+        self.rainbow_length
+    }
+
     fn from_toml(value: Value) -> (Self, Vec<String>) {
         if let Value::Table(table) = value {
             Theme::from_keys(table)
@@ -396,12 +486,21 @@ impl Theme {
     }
 
     fn from_keys(toml_keys: Map<String, Value>) -> (Self, Vec<String>) {
-        let (styles, scopes, highlights, load_errors) = build_theme_values(toml_keys);
+        let (styles, scopes, highlights, rainbow_length, load_errors) =
+            build_theme_values(toml_keys);
+
+        let scope_index = scopes
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.clone(), Highlight::new(i as u32)))
+            .collect();
 
         let theme = Self {
             styles,
             scopes,
             highlights,
+            scope_index,
+            rainbow_length,
             ..Default::default()
         };
         (theme, load_errors)
@@ -450,7 +549,7 @@ impl ThemePalette {
 
     pub fn string_to_rgb(s: &str) -> Result<Color, String> {
         if s.starts_with('#') {
-            Self::hex_string_to_rgb(s)
+            Color::from_hex(s).map_err(|e| format!("{e}: {s}"))
         } else {
             Self::ansi_string_to_rgb(s)
         }
@@ -461,20 +560,6 @@ impl ThemePalette {
             return Ok(Color::Indexed(index));
         }
         Err(format!("Malformed ANSI: {}", s))
-    }
-
-    fn hex_string_to_rgb(s: &str) -> Result<Color, String> {
-        if s.len() >= 7 {
-            if let (Ok(red), Ok(green), Ok(blue)) = (
-                u8::from_str_radix(&s[1..3], 16),
-                u8::from_str_radix(&s[3..5], 16),
-                u8::from_str_radix(&s[5..7], 16),
-            ) {
-                return Ok(Color::Rgb(red, green, blue));
-            }
-        }
-
-        Err(format!("Malformed hexcode: {}", s))
     }
 
     fn parse_value_as_str(value: &Value) -> Result<&str, String> {
@@ -544,6 +629,21 @@ impl ThemePalette {
             *style = style.fg(self.parse_color(value)?);
         }
         Ok(())
+    }
+
+    fn parse_style_array(&self, value: Value) -> Result<Vec<Style>, String> {
+        let mut styles = Vec::new();
+
+        for v in value
+            .as_array()
+            .ok_or_else(|| format!("Could not parse value as an array: '{value}'"))?
+        {
+            let mut style = Style::default();
+            self.parse_style(&mut style, v.clone())?;
+            styles.push(style);
+        }
+
+        Ok(styles)
     }
 }
 
@@ -626,23 +726,13 @@ mod tests {
     fn convert_to_and_from() {
         let (r, g, b) = (0xFF, 0xFE, 0xFA);
         let highlight = Theme::rgb_highlight(r, g, b);
-        assert_eq!(Theme::decode_rgb_highlight(highlight.0), Some((r, g, b)));
+        assert_eq!(Theme::decode_rgb_highlight(highlight), Some((r, g, b)));
     }
 
     /// make sure we can store all the colors at the end
-    /// ```
-    /// FF FF FF FF FF FF FF FF
-    ///          xor
-    /// FF FF FF FF FF 00 00 00
-    ///           =
-    /// 00 00 00 00 00 FF FF FF
-    /// ```
-    ///
-    /// where the ending `(FF, FF, FF)` represents `(r, g, b)`
     #[test]
     fn full_numeric_range() {
-        assert_eq!(usize::MAX ^ Theme::RGB_START, 256_usize.pow(3));
-        assert_eq!(Theme::RGB_START + 256_usize.pow(3), usize::MAX);
+        assert_eq!(Highlight::MAX - Theme::RGB_START, 256_u32.pow(3));
     }
 
     #[test]
@@ -650,30 +740,27 @@ mod tests {
         // color in the middle
         let (r, g, b) = (0x14, 0xAA, 0xF7);
         assert_eq!(
-            Theme::default().highlight(Theme::rgb_highlight(r, g, b).0),
+            Theme::default().highlight(Theme::rgb_highlight(r, g, b)),
             Style::new().fg(Color::Rgb(r, g, b))
         );
         // pure black
         let (r, g, b) = (0x00, 0x00, 0x00);
         assert_eq!(
-            Theme::default().highlight(Theme::rgb_highlight(r, g, b).0),
+            Theme::default().highlight(Theme::rgb_highlight(r, g, b)),
             Style::new().fg(Color::Rgb(r, g, b))
         );
         // pure white
         let (r, g, b) = (0xff, 0xff, 0xff);
         assert_eq!(
-            Theme::default().highlight(Theme::rgb_highlight(r, g, b).0),
+            Theme::default().highlight(Theme::rgb_highlight(r, g, b)),
             Style::new().fg(Color::Rgb(r, g, b))
         );
     }
 
     #[test]
-    #[should_panic(
-        expected = "index out of bounds: the len is 0 but the index is 18446744073692774399"
-    )]
+    #[should_panic(expected = "index out of bounds: the len is 0 but the index is 4278190078")]
     fn out_of_bounds() {
-        let (r, g, b) = (0x00, 0x00, 0x00);
-
-        Theme::default().highlight(Theme::rgb_highlight(r, g, b).0 - 1);
+        let highlight = Highlight::new(Theme::rgb_highlight(0, 0, 0).get() - 1);
+        Theme::default().highlight(highlight);
     }
 }

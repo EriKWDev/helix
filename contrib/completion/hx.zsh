@@ -5,6 +5,7 @@ _hx() {
 	_arguments -C \
 		"-h[Prints help information]" \
 		"--help[Prints help information]" \
+		"--strict[Bail on error for commands that can fail]" \
 		"-v[Increase logging verbosity]" \
 		"-vv[Increase logging verbosity]" \
 		"-vvv[Increase logging verbosity]" \
@@ -25,7 +26,7 @@ _hx() {
 
 	case "$state" in
 	health)
-		local languages=($(hx --health | tail -n '+11' | awk '{print $1}' | sed 's/\x1b\[[0-9;]*m//g;s/[✘✓]//g'))
+		local languages=($(hx --health all-languages | tail -n '+2' | awk '{print $1}' | sed 's/\x1b\[[0-9;]*m//g;s/[✘✓]//g'))
 		_values 'language' $languages
 		;;
 	grammar)

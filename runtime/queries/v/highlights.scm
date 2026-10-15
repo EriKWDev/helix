@@ -1,4 +1,4 @@
-(comment) @comment
+[(line_comment) (block_comment)] @comment
 
 (module_clause
  (identifier) @namespace)
@@ -45,6 +45,13 @@
 (interface_method_definition
  name: (identifier) @function.method)
 
+; Member access. Placed before the call rules below so a method call
+; `o.m()` is reclaimed as @function.method, while a plain `o.field`
+; access stays a member.
+(field_name) @variable.other.member
+(selector_expression
+ field: (reference_expression) @variable.other.member)
+
 (call_expression
  name: (selector_expression
   field: (reference_expression) @function.method))
@@ -67,11 +74,6 @@
 (struct_field_declaration
  name: (identifier) @variable.other.member)
 
-(field_name) @variable.other.member
-
-(selector_expression
- field: (reference_expression) @variable.other.member)
-
 (int_literal) @constant.numeric.integer
 (escape_sequence) @constant.character.escape
 
@@ -84,9 +86,9 @@
 ] @string
 
 (string_interpolation
- (braced_interpolation_opening) @punctuation.bracket
- (interpolated_expression) @embedded
- (braced_interpolation_closing) @punctuation.bracket)
+ (interpolation_opening) @punctuation.bracket
+ (interpolation_expression) @embedded
+ (interpolation_closing) @punctuation.bracket)
 
 (attribute) @attribute
 
@@ -98,6 +100,7 @@
  (true)
  (false)
 ] @constant.builtin.boolean
+(nil) @constant.builtin
 
 [
   "pub"
@@ -106,7 +109,6 @@
   "defer"
   "unsafe"
   "sql"
-  (nil)
   (none)
 ] @keyword
 
@@ -159,7 +161,7 @@
 
 [
   "fn"
-] @keyword.control.function
+] @keyword.function
 
 
 [

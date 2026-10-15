@@ -53,6 +53,7 @@
 [
  "in"
  "local"
+ "global"
  (break_statement)
  "goto"
 ] @keyword
@@ -144,12 +145,6 @@
 
 (dot_index_expression field: (identifier) @variable.other.member)
 
-(table_constructor
-[
-  "{"
-  "}"
-] @constructor)
-
 ;; Functions
 
 (parameters (identifier) @variable.parameter)
@@ -189,13 +184,16 @@
     name: (identifier) @function
     value: (function_definition)))
 
+;; Property
+(dot_index_expression field: (identifier) @variable.other.member)
+
 (function_call
   name: [
-    (identifier) @function.call
+    (identifier) @function
     (dot_index_expression
-      field: (identifier) @function.call)
+      field: (identifier) @function)
     (method_index_expression
-      method: (identifier) @function.method.call)
+      method: (identifier) @function.method)
   ])
 
 ; TODO: incorrectly highlights variable N in `N, nop = 42, function() end`
@@ -216,6 +214,3 @@
 ; A bit of a tricky one, this will only match field names
 (field . (identifier) @variable.other.member (_))
 (hash_bang_line) @comment
-
-;; Property
-(dot_index_expression field: (identifier) @variable.other.member)

@@ -1,7 +1,6 @@
-use std::{cmp::Reverse, iter};
+use std::{borrow::Cow, cmp::Reverse, iter};
 
 use ropey::iter::Chars;
-use tree_sitter::{Node, QueryCursor};
 
 use crate::{
     char_idx_at_visual_offset,
@@ -13,9 +12,10 @@ use crate::{
     },
     line_ending::rope_is_line_ending,
     position::char_idx_at_visual_block_offset,
-    syntax::LanguageConfiguration,
+    syntax,
     text_annotations::TextAnnotations,
     textobject::TextObject,
+    tree_sitter::Node,
     visual_offset_from_block, Range, RopeSlice, Selection, Syntax,
 };
 
@@ -558,31 +558,37 @@ fn reached_target(target: WordMotionTarget, prev_ch: char, next_ch: char) -> boo
     }
 }
 
-/// Finds the range of the next or previous textobject in the syntax sub-tree of `node`.
+/// Finds the range of the next or previous textobject in the syntax tree.
 /// Returns the range in the forwards direction.
 pub fn goto_treesitter_object(
     slice: RopeSlice,
     range: Range,
     object_name: &str,
     dir: Direction,
-    slice_tree: Node,
-    lang_config: &LanguageConfiguration,
+    syntax: &Syntax,
+    loader: &syntax::Loader,
     count: usize,
 ) -> Range {
     let get_range = move |range: Range| -> Option<Range> {
         let byte_pos = slice.char_to_byte(range.cursor(slice));
 
+        // Walk the layer at the cursor with that language's own tree and textobject query.
+        // Resolved per step so the motion can cross into and out of injected regions.
+        let layer = syntax.layer_for_byte_range(byte_pos as u32, byte_pos as u32);
+        let slice_tree = syntax
+            .tree_for_byte_range(byte_pos as u32, byte_pos as u32)
+            .root_node();
+        let textobject_query = loader.textobject_query(syntax.layer(layer).language);
+
         let cap_name = |t: TextObject| format!("{}.{}", object_name, t);
-        let mut cursor = QueryCursor::new();
-        let nodes = lang_config.textobject_query()?.capture_nodes_any(
+        let nodes = textobject_query?.capture_nodes_any(
             &[
                 &cap_name(TextObject::Movement),
                 &cap_name(TextObject::Around),
                 &cap_name(TextObject::Inside),
             ],
-            slice_tree,
+            &slice_tree,
             slice,
-            &mut cursor,
         )?;
 
         let node = match dir {
@@ -617,14 +623,15 @@ pub fn goto_treesitter_object(
     last_range
 }
 
-fn find_parent_start(mut node: Node) -> Option<Node> {
+fn find_parent_start<'tree>(node: &Node<'tree>) -> Option<Node<'tree>> {
     let start = node.start_byte();
+    let mut node = Cow::Borrowed(node);
 
     while node.start_byte() >= start || !node.is_named() {
-        node = node.parent()?;
+        node = Cow::Owned(node.parent()?);
     }
 
-    Some(node)
+    Some(node.into_owned())
 }
 
 pub fn move_parent_node_end(
@@ -635,8 +642,8 @@ pub fn move_parent_node_end(
     movement: Movement,
 ) -> Selection {
     selection.transform(|range| {
-        let start_from = text.char_to_byte(range.from());
-        let start_to = text.char_to_byte(range.to());
+        let start_from = text.char_to_byte(range.from()) as u32;
+        let start_to = text.char_to_byte(range.to()) as u32;
 
         let mut node = match syntax.named_descendant_for_byte_range(start_from, start_to) {
             Some(node) => node,
@@ -654,18 +661,18 @@ pub fn move_parent_node_end(
             // moving forward, we always want to move one past the end of the
             // current node, so use the end byte of the current node, which is an exclusive
             // end of the range
-            Direction::Forward => text.byte_to_char(node.end_byte()),
+            Direction::Forward => text.byte_to_char(node.end_byte() as usize),
 
             // moving backward, we want the cursor to land on the start char of
             // the current node, or if it is already at the start of a node, to traverse up to
             // the parent
             Direction::Backward => {
-                let end_head = text.byte_to_char(node.start_byte());
+                let end_head = text.byte_to_char(node.start_byte() as usize);
 
                 // if we're already on the beginning, look up to the parent
                 if end_head == range.cursor(text) {
-                    node = find_parent_start(node).unwrap_or(node);
-                    text.byte_to_char(node.start_byte())
+                    node = find_parent_start(&node).unwrap_or(node);
+                    text.byte_to_char(node.start_byte() as usize)
                 } else {
                     end_head
                 }

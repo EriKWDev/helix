@@ -2,88 +2,51 @@
 ; Definitions
 ; -----------
 
-; Variables
-(assignment
-  (identifier) @local.definition)
-
-(assignment
-  (tuple_expression
-    (identifier) @local.definition))
-
 ; Constants
 (const_statement
   (assignment
-    . (identifier) @local.definition))
+    . (identifier) @local.definition.constant))
 
-; let/const bindings
-(let_binding
-  (identifier) @local.definition)
+; Parameters (now in the signature's argument_list)
+(argument_list
+  (identifier) @local.definition.variable.parameter)
 
-(let_binding
-  (tuple_expression
-    (identifier) @local.definition))
+(argument_list
+  (assignment
+    . (identifier) @local.definition.variable.parameter))
 
-; For bindings
-(for_binding
-  (identifier) @local.definition)
+(argument_list
+  (splat_expression
+    (identifier) @local.definition.variable.parameter))
 
-(for_binding
-  (tuple_expression
-    (identifier) @local.definition))
-
-; Types
-(struct_definition
-  name: (identifier) @local.definition)
-
-(abstract_definition
-  name: (identifier) @local.definition)
-
-(abstract_definition
-  name: (identifier) @local.definition)
-
-(type_parameter_list
-  (identifier) @local.definition)
-
-; Module imports
-(import_statement
-  (identifier) @local.definition)
-
-; Parameters
-(parameter_list
-  (identifier) @local.definition)
-
-(optional_parameter
-  .
-  (identifier) @local.definition)
-
-(slurp_parameter
-  (identifier) @local.definition)
-
-(typed_parameter
-  parameter: (identifier) @local.definition
-  (_))
+(argument_list
+  (typed_expression
+    . (identifier) @local.definition.variable.parameter))
 
 ; Single parameter arrow function
-(function_expression
+(arrow_function_expression
   .
-  (identifier) @local.definition)
-
-; Function/macro definitions
-(function_definition
-  name: (identifier) @local.definition) @local.scope
-
-(short_function_definition
-  name: (identifier) @local.definition) @local.scope
-
-(macro_definition
-  name: (identifier) @local.definition) @local.scope
+  (identifier) @local.definition.variable.parameter)
 
 ; ----------
 ; References
 ; ----------
 
 (identifier) @local.reference
- 
+
+; A call's function name, field member access, and keyword-argument names are
+; not variable references; cancel resolution so they keep their highlights.scm
+; class even when a same-named local is in scope.
+(call_expression
+  . (identifier) @_)
+(field_expression
+  (_)
+  (identifier) @_)
+(call_expression
+  (argument_list
+    (assignment
+      . (identifier) @_)))
+
 ; ------
 ; Scopes
 ; ------
@@ -97,5 +60,7 @@
   (let_statement)
   (quote_statement)
   (do_clause)
-] @local.scope 
+  (function_definition)
+  (macro_definition)
+] @local.scope
 

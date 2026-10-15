@@ -9,13 +9,13 @@ use crate::{
     },
     line_ending::get_line_ending,
     movement::Direction,
+    tree_sitter::Node,
     Assoc, ChangeSet, RopeSlice,
 };
 use helix_stdx::range::is_subset;
 use helix_stdx::rope::{self, RopeSliceExt};
 use smallvec::{smallvec, SmallVec};
 use std::{borrow::Cow, iter, slice};
-use tree_sitter::Node;
 
 /// A single selection range.
 ///
@@ -76,8 +76,8 @@ impl Range {
     }
 
     pub fn from_node(node: Node, text: RopeSlice, direction: Direction) -> Self {
-        let from = text.byte_to_char(node.start_byte());
-        let to = text.byte_to_char(node.end_byte());
+        let from = text.byte_to_char(node.start_byte() as usize);
+        let to = text.byte_to_char(node.end_byte() as usize);
         Range::new(from, to).with_direction(direction)
     }
 
@@ -1165,6 +1165,68 @@ mod test {
             ),
             Some(Selection::new(
                 smallvec![Range::point(12), Range::new(13, 30), Range::new(31, 36)],
+                0
+            ))
+        );
+    }
+
+    #[test]
+    fn test_select_on_matches_crlf() {
+        let r = Rope::from_str("This\r\nString\r\n\r\ncontains multiple\r\nlines");
+        let s = r.slice(..);
+
+        let start_of_line = rope::RegexBuilder::new()
+            .syntax(rope::Config::new().multi_line(true).crlf(true))
+            .build(r"^")
+            .unwrap();
+        let end_of_line = rope::RegexBuilder::new()
+            .syntax(rope::Config::new().multi_line(true).crlf(true))
+            .build(r"$")
+            .unwrap();
+
+        // line without ending
+        assert_eq!(
+            select_on_matches(s, &Selection::single(0, 4), &start_of_line),
+            Some(Selection::single(0, 0))
+        );
+        assert_eq!(
+            select_on_matches(s, &Selection::single(0, 4), &end_of_line),
+            None
+        );
+        // line with ending
+        assert_eq!(
+            select_on_matches(s, &Selection::single(0, 5), &start_of_line),
+            Some(Selection::single(0, 0))
+        );
+        assert_eq!(
+            select_on_matches(s, &Selection::single(0, 5), &end_of_line),
+            Some(Selection::single(4, 4))
+        );
+        // line with start of next line
+        assert_eq!(
+            select_on_matches(s, &Selection::single(0, 7), &start_of_line),
+            Some(Selection::new(
+                smallvec![Range::point(0), Range::point(6)],
+                0
+            ))
+        );
+        assert_eq!(
+            select_on_matches(s, &Selection::single(0, 6), &end_of_line),
+            Some(Selection::single(4, 4))
+        );
+
+        // multiple lines
+        assert_eq!(
+            select_on_matches(
+                s,
+                &Selection::single(0, s.len_chars()),
+                &rope::RegexBuilder::new()
+                    .syntax(rope::Config::new().multi_line(true).crlf(true))
+                    .build(r"^[a-z ]*$")
+                    .unwrap()
+            ),
+            Some(Selection::new(
+                smallvec![Range::point(14), Range::new(16, 33), Range::new(35, 40)],
                 0
             ))
         );

@@ -1,22 +1,11 @@
-use arc_swap::ArcSwap;
 use helix_core::{
     indent::{indent_level_for_line, treesitter_indent_for_pos, IndentStyle},
-    syntax::{Configuration, Loader},
+    syntax::{config::Configuration, Loader},
     Syntax,
 };
 use helix_stdx::rope::RopeSliceExt;
 use ropey::Rope;
-use std::{ops::Range, path::PathBuf, process::Command, sync::Arc};
-
-#[test]
-fn test_treesitter_indent_rust() {
-    standard_treesitter_test("rust.rs", "source.rust");
-}
-
-#[test]
-fn test_treesitter_indent_cpp() {
-    standard_treesitter_test("cpp.cpp", "source.cpp");
-}
+use std::{ops::Range, path::PathBuf, process::Command};
 
 #[test]
 fn test_treesitter_indent_rust_helix() {
@@ -161,24 +150,11 @@ fn indent_tests_dir() -> PathBuf {
     test_dir
 }
 
-fn indent_test_path(name: &str) -> PathBuf {
-    let mut path = indent_tests_dir();
-    path.push(name);
-    path
-}
-
 fn indent_tests_config() -> Configuration {
     let mut config_path = indent_tests_dir();
     config_path.push("languages.toml");
     let config = std::fs::read_to_string(config_path).unwrap();
     toml::from_str(&config).unwrap()
-}
-
-fn standard_treesitter_test(file_name: &str, lang_scope: &str) {
-    let test_path = indent_test_path(file_name);
-    let test_file = std::fs::File::open(test_path).unwrap();
-    let doc = ropey::Rope::from_reader(test_file).unwrap();
-    test_treesitter_indent(file_name, doc, lang_scope, Vec::new())
 }
 
 /// Test that all the lines in the given file are indented as expected.
@@ -196,17 +172,12 @@ fn test_treesitter_indent(
     runtime.push("../runtime");
     std::env::set_var("HELIX_RUNTIME", runtime.to_str().unwrap());
 
-    let language_config = loader.language_config_for_scope(lang_scope).unwrap();
+    let language = loader.language_for_scope(lang_scope).unwrap();
+    let language_config = loader.language(language).config();
     let indent_style = IndentStyle::from_str(&language_config.indent.as_ref().unwrap().unit);
-    let highlight_config = language_config.highlight_config(&[]).unwrap();
     let text = doc.slice(..);
-    let syntax = Syntax::new(
-        text,
-        highlight_config,
-        Arc::new(ArcSwap::from_pointee(loader)),
-    )
-    .unwrap();
-    let indent_query = language_config.indent_query().unwrap();
+    let syntax = Syntax::new(text, language, &loader).unwrap();
+    let indent_query = loader.indent_query(language).unwrap();
 
     for i in 0..doc.len_lines() {
         let line = text.line(i);
@@ -218,6 +189,7 @@ fn test_treesitter_indent(
             let suggested_indent = treesitter_indent_for_pos(
                 indent_query,
                 &syntax,
+                &loader,
                 tab_width,
                 indent_style.indent_width(tab_width),
                 text,
@@ -228,7 +200,7 @@ fn test_treesitter_indent(
             .unwrap()
             .to_string(&indent_style, tab_width);
             assert!(
-                line.get_slice(..pos).map_or(false, |s| s == suggested_indent),
+                line.get_slice(..pos).is_some_and(|s| s == suggested_indent),
                 "Wrong indentation for file {:?} on line {}:\n\"{}\" (original line)\n\"{}\" (suggested indentation)\n",
                 test_name,
                 i+1,

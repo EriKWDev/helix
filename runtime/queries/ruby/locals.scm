@@ -1,4 +1,12 @@
-((method) @local.scope
+; Method, class, module and singleton-class bodies don't see locals from the
+; enclosing scope in Ruby, so they must not inherit.
+([
+  (method)
+  (singleton_method)
+  (class)
+  (module)
+  (singleton_class)
+] @local.scope
  (#set! local.scope-inherits false))
 
 [
@@ -7,21 +15,19 @@
   (do_block)
 ] @local.scope
 
-(block_parameter (identifier) @local.definition)
-(block_parameters (identifier) @local.definition)
-(destructured_parameter (identifier) @local.definition)
-(hash_splat_parameter (identifier) @local.definition)
-(lambda_parameters (identifier) @local.definition)
-(method_parameters (identifier) @local.definition)
-(splat_parameter (identifier) @local.definition)
-
-(keyword_parameter name: (identifier) @local.definition)
-(optional_parameter name: (identifier) @local.definition)
+(block_parameter (identifier) @local.definition.variable.parameter)
+(block_parameters (identifier) @local.definition.variable.parameter)
+(destructured_parameter (identifier) @local.definition.variable.parameter)
+(hash_splat_parameter (identifier) @local.definition.variable.parameter)
+(lambda_parameters (identifier) @local.definition.variable.parameter)
+(method_parameters (identifier) @local.definition.variable.parameter)
+(splat_parameter (identifier) @local.definition.variable.parameter)
+(keyword_parameter name: (identifier) @local.definition.variable.parameter)
+(optional_parameter name: (identifier) @local.definition.variable.parameter)
 
 (identifier) @local.reference
 
-(assignment left: (identifier) @local.definition)
-(operator_assignment left: (identifier) @local.definition)
-(left_assignment_list (identifier) @local.definition)
-(rest_assignment (identifier) @local.definition)
-(destructured_left_assignment (identifier) @local.definition)
+; A method-call name is not a variable reference (the grammar only forms `call`
+; when it's syntactically a call), so a same-named local must not capture it.
+(call
+  method: (identifier) @_)

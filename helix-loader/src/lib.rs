@@ -1,5 +1,6 @@
 pub mod config;
 pub mod grammar;
+pub mod workspace_trust;
 
 use helix_stdx::{env::current_working_dir, path};
 
@@ -8,12 +9,12 @@ use std::path::{Path, PathBuf};
 
 pub const VERSION_AND_GIT_HASH: &str = env!("VERSION_AND_GIT_HASH");
 
-static RUNTIME_DIRS: once_cell::sync::Lazy<Vec<PathBuf>> =
-    once_cell::sync::Lazy::new(prioritize_runtime_dirs);
+static RUNTIME_DIRS: std::sync::LazyLock<Vec<PathBuf>> =
+    std::sync::LazyLock::new(prioritize_runtime_dirs);
 
-static CONFIG_FILE: once_cell::sync::OnceCell<PathBuf> = once_cell::sync::OnceCell::new();
+static CONFIG_FILE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
-static LOG_FILE: once_cell::sync::OnceCell<PathBuf> = once_cell::sync::OnceCell::new();
+static LOG_FILE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
 pub fn initialize_config_file(specified_file: Option<PathBuf>) {
     let config_file = specified_file.unwrap_or_else(default_config_file);
@@ -132,6 +133,13 @@ pub fn cache_dir() -> PathBuf {
     path
 }
 
+pub fn data_dir() -> PathBuf {
+    let strategy = choose_base_strategy().expect("Unable to find the data directory!");
+    let mut path = strategy.data_dir();
+    path.push("helix");
+    path
+}
+
 pub fn config_file() -> PathBuf {
     CONFIG_FILE.get().map(|path| path.to_path_buf()).unwrap()
 }
@@ -142,6 +150,10 @@ pub fn log_file() -> PathBuf {
 
 pub fn workspace_config_file() -> PathBuf {
     find_workspace().0.join(".helix").join("config.toml")
+}
+
+pub fn workspace_lang_config_file() -> PathBuf {
+    find_workspace().0.join(".helix").join("languages.toml")
 }
 
 pub fn lang_config_file() -> PathBuf {
@@ -244,7 +256,12 @@ pub fn merge_toml_values(left: toml::Value, right: toml::Value, merge_depth: usi
 /// Otherwise (workspace, false) is returned
 pub fn find_workspace() -> (PathBuf, bool) {
     let current_dir = current_working_dir();
-    for ancestor in current_dir.ancestors() {
+    find_workspace_in(current_dir)
+}
+
+pub fn find_workspace_in(dir: impl AsRef<Path>) -> (PathBuf, bool) {
+    let dir = dir.as_ref();
+    for ancestor in dir.ancestors() {
         if ancestor.join(".git").exists()
             || ancestor.join(".svn").exists()
             || ancestor.join(".jj").exists()
@@ -254,7 +271,7 @@ pub fn find_workspace() -> (PathBuf, bool) {
         }
     }
 
-    (current_dir, true)
+    (dir.to_owned(), true)
 }
 
 fn default_config_file() -> PathBuf {

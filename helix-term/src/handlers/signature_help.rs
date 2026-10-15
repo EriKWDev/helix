@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use helix_core::syntax::LanguageServerFeature;
+use helix_core::syntax::config::LanguageServerFeature;
 use helix_event::{cancelable_future, register_hook, send_blocking, TaskController, TaskHandle};
 use helix_lsp::lsp::{self, SignatureInformation};
 use helix_stdx::rope::RopeSliceExt;
@@ -336,10 +336,8 @@ pub(super) fn register_hooks(handlers: &Handlers) {
                     compositor.remove(SignatureHelp::ID);
                 }));
             }
-            (_, Mode::Insert) => {
-                if event.cx.editor.config().lsp.auto_signature_help {
-                    send_blocking(&tx, SignatureHelpEvent::Trigger);
-                }
+            (_, Mode::Insert) if event.cx.editor.config().lsp.auto_signature_help => {
+                send_blocking(&tx, SignatureHelpEvent::Trigger);
             }
             _ => (),
         }
