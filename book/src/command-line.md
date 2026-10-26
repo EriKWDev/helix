@@ -77,6 +77,8 @@ The following commands support expansions but otherwise pass the given argument 
 * `:pipe-to`
 * `:run-shell-command`
 
+A command line starting with `/` is shorthand for `:run-shell-command`, with no space needed: `:/make -j8` is the same as `:sh make -j8`.
+
 For example executing `:sh echo "%{buffer_name}:%{cursor_column}"` would pass text like `echo "README.md:1"` as an argument to the shell program: the expansions are evaluated but not the quotes. As mentioned above, percent characters can be used in shell commands by doubling the percent character. To insert the output of a command like `date -u +'%Y-%m-%d'` use `:insert-output date -u +'%%Y-%%m-%%d'`.
 
 The `:set-option` and `:toggle-option` commands use regular parsing for the first argument - the config option name - and parse the rest depending on the config option's type. `:set-option` interprets the second argument as a string for string config options and parses everything else as JSON.

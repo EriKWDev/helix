@@ -32,7 +32,19 @@ use std::{borrow::Cow, collections::HashMap, error::Error, fmt, ops, slice, vec}
 /// The third tuple member describes whether the command part is finished. When this boolean is
 /// true the completion code for the command line should complete command names, otherwise
 /// command arguments.
+///
+/// A line starting with `/` is shorthand for a shell command: `/ls -la` splits into the command
+/// `/` and the arguments `ls -la`, without needing a space after the slash.
 pub fn split(line: &str) -> (&str, &str, bool) {
+    if let Some(rest) = line.strip_prefix('/') {
+        return (&line[..1], rest, false);
+    }
+
+    split_words(line)
+}
+
+/// Like [split] but without the `/` shorthand: splits on the first space or tab only.
+pub fn split_words(line: &str) -> (&str, &str, bool) {
     const SEPARATOR_PATTERN: [char; 2] = [' ', '\t'];
 
     let (command, rest) = line.split_once(SEPARATOR_PATTERN).unwrap_or((line, ""));
@@ -1105,6 +1117,14 @@ mod test {
         assert_tokens(r#"'hello world'"#, &["hello world"]);
 
         assert_tokens(r#""hello "" world""#, &["hello \" world"]);
+    }
+
+    #[test]
+    fn split_slash_shorthand() {
+        assert_eq!(split("/ls -la"), ("/", "ls -la", false));
+        assert_eq!(split("/"), ("/", "", false));
+        assert_eq!(split("sh ls"), ("sh", "ls", false));
+        assert_eq!(split_words("/usr/bin/ls -la"), ("/usr/bin/ls", "-la", false));
     }
 
     #[test]

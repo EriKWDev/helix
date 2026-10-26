@@ -782,7 +782,7 @@ pub mod completers {
     }
 
     pub fn shell(editor: &Editor, input: &str) -> Vec<Completion> {
-        let (command, args, complete_command) = command_line::split(input);
+        let (command, args, complete_command) = command_line::split_words(input);
 
         if complete_command {
             return program(editor, command);

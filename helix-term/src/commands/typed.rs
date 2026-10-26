@@ -3977,7 +3977,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
     },
     TypableCommand {
         name: "run-shell-command",
-        aliases: &["sh", "!"],
+        aliases: &["sh", "!", "/"],
         doc: "Run a shell command",
         fun: run_shell_command,
         completer: SHELL_COMPLETER,
@@ -4256,7 +4256,7 @@ fn complete_command_line(editor: &Editor, input: &str) -> Vec<ui::prompt::Comple
         TYPABLE_COMMAND_MAP
             .get(command)
             .map_or_else(Vec::new, |cmd| {
-                let args_offset = command.len() + 1;
+                let args_offset = input.len() - rest.len();
                 complete_command_args(editor, cmd.signature, &cmd.completer, rest, args_offset)
             })
     }
