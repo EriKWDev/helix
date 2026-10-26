@@ -70,6 +70,16 @@ async fn variable_expansion() -> anyhow::Result<()> {
         Severity::Info,
     )
     .await?;
+    // Single-letter short names, bare or delimited:
+    test_statusline(r#":echo "%l:%c""#, "1:1", Severity::Info).await?;
+    test_statusline(r#":echo "%{l}x""#, "1x", Severity::Info).await?;
+    test_statusline(r#":echo %t"#, "text", Severity::Info).await?;
+    test_statusline(
+        r#":echo %q"#,
+        "'echo': unknown variable 'q'",
+        Severity::Error,
+    )
+    .await?;
 
     Ok(())
 }

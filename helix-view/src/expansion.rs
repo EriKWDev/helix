@@ -16,6 +16,7 @@ use crate::Editor;
 // * Add an item to the `VARIANTS` constant - this enables completion.
 // * Add a branch in `Variable::as_str`, converting the name from TitleCase to snake_case.
 // * Add a branch in `Variable::from_name` with the reverse association.
+// * Optionally add a single-letter alias in `Variable::short_name`.
 // * Add a branch in the `expand_variable` function to read the value from the editor.
 // * Add the new variable to the documentation in `book/src/command-line.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,7 +82,31 @@ impl Variable {
         }
     }
 
+    /// Single-letter alias usable as `%f` or `%{f}`.
+    pub const fn short_name(&self) -> char {
+        match self {
+            Self::CursorLine => 'l',
+            Self::CursorColumn => 'c',
+            Self::BufferName => 'b',
+            Self::FilePathAbsolute => 'f',
+            Self::LineEnding => 'n',
+            Self::CurrentWorkingDirectory => 'd',
+            Self::WorkspaceDirectory => 'w',
+            Self::Language => 't',
+            Self::Selection => 's',
+            Self::SelectionLineStart => 'S',
+            Self::SelectionLineEnd => 'E',
+        }
+    }
+
     pub fn from_name(s: &str) -> Option<Self> {
+        let mut chars = s.chars();
+        if let (Some(c), None) = (chars.next(), chars.next()) {
+            return Self::VARIANTS
+                .iter()
+                .copied()
+                .find(|var| var.short_name() == c);
+        }
         match s {
             "cursor_line" => Some(Self::CursorLine),
             "cursor_column" => Some(Self::CursorColumn),

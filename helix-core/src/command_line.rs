@@ -543,9 +543,27 @@ impl<'a> Tokenizer<'a> {
         let kind_start = self.pos;
         self.pos += self.input[self.pos..]
             .bytes()
-            .take_while(|b| b.is_ascii_lowercase())
+            .take_while(|b| b.is_ascii_alphabetic())
             .count();
         let kind = &self.input[kind_start..self.pos];
+
+        // A single letter without a delimiter is a short variable alias, for example `%f` for
+        // `%{file_path_absolute}`. This is only done when validating so that completion of
+        // expansion kinds (`%s` -> `%sh{`) keeps working while typing.
+        if self.validate
+            && kind.len() == 1
+            && !matches!(
+                self.byte(),
+                Some(b'(' | b'[' | b'{' | b'<' | b'\'' | b'\"' | b'|')
+            )
+        {
+            return Some(Ok(Token {
+                kind: TokenKind::Expansion(ExpansionKind::Variable),
+                content_start: kind_start,
+                content: Cow::Borrowed(kind),
+                is_terminated: true,
+            }));
+        }
 
         let (open, close) = match self.byte() {
             // We support a couple of hard-coded chars only to make sure we can provide more
@@ -1125,6 +1143,9 @@ mod test {
             r#"echo %sh{echo "%{cursor_line}"}"#,
             &["echo", r#"echo "%{cursor_line}""#],
         );
+        // Short variable aliases:
+        assert_tokens(r#"echo %f %S:%E"#, &["echo", "f", "S", ":%E"]);
+        assert_tokens(r#"echo %b.bak"#, &["echo", "b", ".bak"]);
         // Completion should provide variable names here. (Unbalanced nesting)
         assert_incomplete_tokens(r#"echo %sh{echo "%{c"#, &["echo", r#"echo "%{c"#]);
         assert_incomplete_tokens(r#"echo %{hello {{} world}"#, &["echo", "hello {{} world}"]);

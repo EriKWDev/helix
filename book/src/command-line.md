@@ -41,19 +41,21 @@ When no `<kind>` is provided, Helix will expand a **variable**. For example `%{c
 
 The following variables are supported:
 
-| Name | Description |
-|---   |---          |
-| `cursor_line` | The line number of the primary cursor in the currently focused document, starting at 1. |
-| `cursor_column` | The column number of the primary cursor in the currently focused document, starting at 1. This is counted as the number of grapheme clusters from the start of the line rather than bytes or codepoints. |
-| `buffer_name` | The relative path of the currently focused document. `[scratch]` is expanded instead for scratch buffers. |
-| `file_path_absolute` | The absolute path of the currently focused document. For scratch buffers this will default to the current working directory. |
-| `line_ending` | A string containing the line ending of the currently focused document. For example on Unix systems this is usually a line-feed character (`\n`) but on Windows systems this may be a carriage-return plus a line-feed (`\r\n`). The line ending kind of the currently focused document can be inspected with the `:line-ending` command. |
-| `current_working_directory` | Current working directory |
-| `workspace_directory` | Nearest ancestor directory of the current working directory that contains `.git`, `.svn`, `jj` or `.helix` |
-| `language` | A string containing the language name of the currently focused document.|
-| `selection` | A string containing the contents of the primary selection of the currently focused document. |
-| `selection_line_start` | The line number of the start of the primary selection in the currently focused document, starting at 1. |
-| `selection_line_end` | The line number of the end of the primary selection in the currently focused document, starting at 1. |
+| Name | Short | Description |
+|---   |---    |---          |
+| `cursor_line` | `%l` | The line number of the primary cursor in the currently focused document, starting at 1. |
+| `cursor_column` | `%c` | The column number of the primary cursor in the currently focused document, starting at 1. This is counted as the number of grapheme clusters from the start of the line rather than bytes or codepoints. |
+| `buffer_name` | `%b` | The relative path of the currently focused document. `[scratch]` is expanded instead for scratch buffers. |
+| `file_path_absolute` | `%f` | The absolute path of the currently focused document. For scratch buffers this will default to the current working directory. |
+| `line_ending` | `%n` | A string containing the line ending of the currently focused document. For example on Unix systems this is usually a line-feed character (`\n`) but on Windows systems this may be a carriage-return plus a line-feed (`\r\n`). The line ending kind of the currently focused document can be inspected with the `:line-ending` command. |
+| `current_working_directory` | `%d` | Current working directory |
+| `workspace_directory` | `%w` | Nearest ancestor directory of the current working directory that contains `.git`, `.svn`, `jj` or `.helix` |
+| `language` | `%t` | A string containing the language name of the currently focused document.|
+| `selection` | `%s` | A string containing the contents of the primary selection of the currently focused document. |
+| `selection_line_start` | `%S` | The line number of the start of the primary selection in the currently focused document, starting at 1. |
+| `selection_line_end` | `%E` | The line number of the end of the primary selection in the currently focused document, starting at 1. |
+
+Every variable also has a single-letter short name. It can be used bare, without delimiters, as in `%f`, or inside delimiters, as in `%{f}`. The delimited form is needed when a letter directly follows the alias: `%{f}x` rather than `%fx`. For example `:sh gcc %f -o %{d}/out` compiles the current file.
 
 Aside from editor variables, the following expansions may be used:
 
