@@ -269,11 +269,15 @@ pub enum ExpansionKind {
     ///
     /// For example `%reg{a}`.
     Register,
+    /// Expand a variable and quote it for a POSIX shell.
+    ///
+    /// For example `%q{file_path_absolute}` or `%q{f}`.
+    Quote,
 }
 
 impl ExpansionKind {
     pub const VARIANTS: &'static [Self] =
-        &[Self::Variable, Self::Unicode, Self::Shell, Self::Register];
+        &[Self::Variable, Self::Unicode, Self::Shell, Self::Register, Self::Quote];
 
     pub const fn as_str(&self) -> &'static str {
         match self {
@@ -281,6 +285,7 @@ impl ExpansionKind {
             Self::Unicode => "u",
             Self::Shell => "sh",
             Self::Register => "reg",
+            Self::Quote => "q",
         }
     }
 
@@ -290,6 +295,7 @@ impl ExpansionKind {
             "u" => Some(Self::Unicode),
             "sh" => Some(Self::Shell),
             "reg" => Some(Self::Register),
+            "q" => Some(Self::Quote),
             _ => None,
         }
     }

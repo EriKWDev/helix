@@ -4359,7 +4359,7 @@ pub fn complete_command_args(
                 });
             complete_expand(editor, &token, arg_completer, offset + token.content_start)
         }
-        TokenKind::Expansion(ExpansionKind::Variable) => {
+        TokenKind::Expansion(ExpansionKind::Variable | ExpansionKind::Quote) => {
             complete_variable_expansion(&token.content, offset + token.content_start)
         }
         TokenKind::Expansion(ExpansionKind::Unicode) => Vec::new(),
@@ -4454,7 +4454,7 @@ fn complete_expand(
 
             let local_offset = offset + idx + token.content_start;
             match token.kind {
-                TokenKind::Expansion(ExpansionKind::Variable) => {
+                TokenKind::Expansion(ExpansionKind::Variable | ExpansionKind::Quote) => {
                     return complete_variable_expansion(&token.content, local_offset);
                 }
                 TokenKind::Expansion(ExpansionKind::Shell) => {

@@ -74,9 +74,23 @@ async fn variable_expansion() -> anyhow::Result<()> {
     test_statusline(r#":echo "%l:%c""#, "1:1", Severity::Info).await?;
     test_statusline(r#":echo "%{l}x""#, "1x", Severity::Info).await?;
     test_statusline(r#":echo %t"#, "text", Severity::Info).await?;
+    // Shell-quoted variables, and bare `%q` for the quoted selection:
+    test_statusline(r#":echo %q{t}"#, "'text'", Severity::Info).await?;
+    test_key_sequence(
+        &mut AppBuilder::new()
+            .with_input_text("#[it's $HOME|]#")
+            .build()?,
+        Some(":echo %q<ret>"),
+        Some(&|app| {
+            let (status, _) = app.editor.get_status().unwrap();
+            assert_eq!(status.as_ref(), r"'it'\''s $HOME'");
+        }),
+        false,
+    )
+    .await?;
     test_statusline(
-        r#":echo %q"#,
-        "'echo': unknown variable 'q'",
+        r#":echo %x"#,
+        "'echo': unknown variable 'x'",
         Severity::Error,
     )
     .await?;

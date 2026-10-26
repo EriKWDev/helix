@@ -132,11 +132,21 @@ pub fn expand<'a>(editor: &Editor, token: Token<'a>) -> Result<Cow<'a, str>> {
     // Note: see the `TokenKind` documentation for more details on how each branch should expand.
     match token.kind {
         TokenKind::Unquoted | TokenKind::Quoted(_) => Ok(token.content),
+        // A bare `%q` is the shell-quoted selection.
+        TokenKind::Expansion(ExpansionKind::Variable) if token.content == "q" => Ok(Cow::Owned(
+            shell_quote(&expand_variable(editor, Variable::Selection)?),
+        )),
         TokenKind::Expansion(ExpansionKind::Variable) => {
             let var = Variable::from_name(&token.content)
                 .ok_or_else(|| anyhow!("unknown variable '{}'", token.content))?;
 
             expand_variable(editor, var)
+        }
+        TokenKind::Expansion(ExpansionKind::Quote) => {
+            let var = Variable::from_name(&token.content)
+                .ok_or_else(|| anyhow!("unknown variable '{}'", token.content))?;
+
+            Ok(Cow::Owned(shell_quote(&expand_variable(editor, var)?)))
         }
         TokenKind::Expansion(ExpansionKind::Unicode) => {
             if let Some(ch) = u32::from_str_radix(token.content.as_ref(), 16)
@@ -159,6 +169,12 @@ pub fn expand<'a>(editor: &Editor, token: Token<'a>) -> Result<Cow<'a, str>> {
             "expansion name tokens cannot be emitted when command line validation is enabled"
         ),
     }
+}
+
+/// Quote a string as a single argument for a POSIX shell, for example `it's` becomes
+/// `'it'\''s'`.
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', r"'\''"))
 }
 
 /// Expand a shell command.
