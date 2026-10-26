@@ -1309,6 +1309,7 @@ impl Document {
         }
 
         self.version_control_head = provider_registry.get_current_head_name(&path);
+        helix_event::dispatch(crate::events::DocumentDidReload { doc: self });
 
         Ok(())
     }

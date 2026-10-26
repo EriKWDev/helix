@@ -68,6 +68,14 @@ impl CommandCompleter {
     }
 }
 
+fn hot(cx: &mut compositor::Context, args: Args, event: PromptEvent) -> anyhow::Result<()> {
+    if event == PromptEvent::Validate {
+        let status = crate::handlers::hot::command(args.first(), cx.editor)?;
+        cx.editor.set_status(status);
+    }
+    Ok(())
+}
+
 fn exit(cx: &mut compositor::Context, args: Args, event: PromptEvent) -> anyhow::Result<()> {
     if event != PromptEvent::Validate {
         return Ok(());
@@ -2994,6 +3002,17 @@ const WRITE_NO_CODE_ACTIONS_FLAG: Flag = Flag {
 };
 
 pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
+    TypableCommand {
+        name: "hot",
+        aliases: &[],
+        doc: "Toggle unsaved-buffer hot compilation. Default socket: out/hot-edit.sock. Use :hot <socket> to enable a specific socket, :hot off to disable, or :hot status to inspect the connection.",
+        fun: hot,
+        completer: CommandCompleter::positional(&[completers::filename]),
+        signature: Signature {
+            positionals: (0, Some(1)),
+            ..Signature::DEFAULT
+        },
+    },
     TypableCommand {
         name: "exit",
         aliases: &["x", "xit"],

@@ -16,6 +16,9 @@ events! {
         changes: &'a ChangeSet,
         ghost_transaction: bool
     }
+    DocumentDidReload<'a> {
+        doc: &'a Document
+    }
     DocumentDidClose<'a> {
         editor: &'a mut Editor,
         doc: Document

@@ -1,5 +1,6 @@
 | Name | Description |
 | --- | --- |
+| `:hot` | Toggle unsaved-buffer hot compilation. Default socket: out/hot-edit.sock. Use :hot <socket> to enable a specific socket, :hot off to disable, or :hot status to inspect the connection. |
 | `:exit`, `:x`, `:xit` | Write changes to disk if the buffer is modified and then quit. Accepts an optional path (:exit some/path.txt). |
 | `:exit!`, `:x!`, `:xit!` | Force write changes to disk, creating necessary subdirectories, if the buffer is modified and then quit. Accepts an optional path (:exit! some/path.txt). |
 | `:quit`, `:q` | Close the current view. |

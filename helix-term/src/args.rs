@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 #[derive(Default)]
 pub struct Args {
     pub display_help: bool,
+    pub hot_socket: Option<PathBuf>,
     pub display_version: bool,
     pub health: bool,
     pub health_arg: Option<String>,
@@ -46,6 +47,10 @@ impl Args {
         while let Some(arg) = argv.next() {
             match arg.as_str() {
                 "--" => break, // stop parsing at this point treat the remaining as files
+                "--hot" => match argv.next().as_deref() {
+                    Some(path) => args.hot_socket = Some(helix_stdx::path::canonicalize(path)),
+                    None => anyhow::bail!("--hot requires a Unix socket path"),
+                },
                 "--version" => args.display_version = true,
                 "--help" => args.display_help = true,
                 "--strict" => args.strict = true,

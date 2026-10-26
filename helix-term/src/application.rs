@@ -129,6 +129,9 @@ impl Application {
             })),
             handlers,
         );
+        if let Some(socket) = args.hot_socket.as_ref() {
+            crate::handlers::hot::command(Some(&socket.to_string_lossy()), &editor)?;
+        }
         Self::load_configured_theme(&mut editor, &config.load(), &mut terminal, theme_mode);
 
         let keys = Box::new(Map::new(Arc::clone(&config), |config: &Config| {
@@ -642,6 +645,9 @@ impl Application {
 
         self.editor
             .set_doc_path(doc_save_event.doc_id, &doc_save_event.path);
+        if let Some(doc) = self.editor.document(doc_save_event.doc_id) {
+            crate::handlers::hot::saved(doc);
+        }
         // TODO: fix being overwritten by lsp
         self.editor.set_status(format!(
             "'{}' written, {lines}L {size}",

@@ -15,6 +15,7 @@ pub use helix_view::handlers::{word_index, Handlers};
 use self::document_colors::DocumentColorsHandler;
 use self::document_links::DocumentLinksHandler;
 
+pub(crate) mod hot;
 mod auto_save;
 mod code_action_hint;
 pub mod completion;
@@ -28,6 +29,7 @@ mod snippet;
 
 pub fn setup(config: Arc<ArcSwap<Config>>) -> Handlers {
     events::register();
+    hot::register_hooks();
 
     let event_tx = completion::CompletionHandler::new(config).spawn();
     let signature_hints = SignatureHelpHandler::new().spawn();

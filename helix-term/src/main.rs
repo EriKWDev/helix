@@ -45,6 +45,7 @@ ARGS:
 
 FLAGS:
     -h, --help                     Print help information
+    --hot <socket>                 Stream unsaved buffers to a native hot compiler
     --strict                       Bail on error for commands that can fail.
     --tutor                        Load the tutorial
     --health [CATEGORY]            Check for potential errors in editor setup
