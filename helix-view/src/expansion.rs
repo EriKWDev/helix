@@ -266,6 +266,14 @@ fn expand_inner<'a>(editor: &Editor, content: Cow<'a, str>) -> Result<Cow<'a, st
             // Otherwise interpret the percent as an expansion. Push up to (but not
             // including) the percent token.
             escaped.push_str(&content[start..idx]);
+            // A lone percent within quotes, like `"%"`, is the file path rather than the start
+            // of a `%"..."` expansion.
+            let quote = content[idx + 1..].chars().next();
+            if matches!(quote, Some('"' | '\'')) && content[..idx].ends_with(quote.unwrap()) {
+                escaped.push_str(&expand_variable(editor, Variable::FilePathAbsolute)?);
+                start = idx + 1;
+                continue;
+            }
             // Then parse the expansion,
             let mut tokenizer = Tokenizer::new(&content[idx..], true);
             let token = tokenizer

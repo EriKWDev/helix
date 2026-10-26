@@ -276,8 +276,13 @@ pub enum ExpansionKind {
 }
 
 impl ExpansionKind {
-    pub const VARIANTS: &'static [Self] =
-        &[Self::Variable, Self::Unicode, Self::Shell, Self::Register, Self::Quote];
+    pub const VARIANTS: &'static [Self] = &[
+        Self::Variable,
+        Self::Unicode,
+        Self::Shell,
+        Self::Register,
+        Self::Quote,
+    ];
 
     pub const fn as_str(&self) -> &'static str {
         match self {
@@ -565,20 +570,22 @@ impl<'a> Tokenizer<'a> {
             .count();
         let kind = &self.input[kind_start..self.pos];
 
-        // A single letter without a delimiter is a short variable alias, for example `%f` for
-        // `%{file_path_absolute}`. This is only done when validating so that completion of
-        // expansion kinds (`%s` -> `%sh{`) keeps working while typing.
+        // Without a delimiter, a single letter is a short variable alias, for example `%f` for
+        // `%{file_path_absolute}`, and a lone `%` is the file path too. This is only done when
+        // validating so that completion of expansion kinds (`%s` -> `%sh{`) keeps working while
+        // typing.
+        let delimited = matches!(
+            self.byte(),
+            Some(b'(' | b'[' | b'{' | b'<' | b'\'' | b'\"' | b'|')
+        );
         if self.validate
-            && kind.len() == 1
-            && !matches!(
-                self.byte(),
-                Some(b'(' | b'[' | b'{' | b'<' | b'\'' | b'\"' | b'|')
-            )
+            && !delimited
+            && (kind.len() == 1 || kind.is_empty() && self.byte() != Some(b'%'))
         {
             return Some(Ok(Token {
                 kind: TokenKind::Expansion(ExpansionKind::Variable),
                 content_start: kind_start,
-                content: Cow::Borrowed(kind),
+                content: Cow::Borrowed(if kind.is_empty() { "f" } else { kind }),
                 is_terminated: true,
             }));
         }
@@ -1130,7 +1137,10 @@ mod test {
         assert_eq!(split("/ls -la"), ("/", "ls -la", false));
         assert_eq!(split("/"), ("/", "", false));
         assert_eq!(split("sh ls"), ("sh", "ls", false));
-        assert_eq!(split_words("/usr/bin/ls -la"), ("/usr/bin/ls", "-la", false));
+        assert_eq!(
+            split_words("/usr/bin/ls -la"),
+            ("/usr/bin/ls", "-la", false)
+        );
     }
 
     #[test]
@@ -1172,6 +1182,9 @@ mod test {
         // Short variable aliases:
         assert_tokens(r#"echo %f %S:%E"#, &["echo", "f", "S", ":%E"]);
         assert_tokens(r#"echo %b.bak"#, &["echo", "b", ".bak"]);
+        // A lone percent is the file path:
+        assert_tokens(r#"echo % %.o"#, &["echo", "f", "f", ".o"]);
+        assert_tokens(r#"echo %"#, &["echo", "f"]);
         // Completion should provide variable names here. (Unbalanced nesting)
         assert_incomplete_tokens(r#"echo %sh{echo "%{c"#, &["echo", r#"echo "%{c"#]);
         assert_incomplete_tokens(r#"echo %{hello {{} world}"#, &["echo", "hello {{} world}"]);

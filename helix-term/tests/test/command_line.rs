@@ -174,11 +174,11 @@ async fn register_expansion() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn percent_escaping() -> anyhow::Result<()> {
-    test_statusline(
-        r#":sh echo hello 10%"#,
-        "'run-shell-command': '%' was not properly escaped. Please use '%%'",
-        Severity::Error,
-    )
-    .await?;
+    // A lone percent is the file path, which is the working directory for a scratch buffer.
+    let cwd = helix_stdx::env::current_working_dir();
+    let cwd = cwd.to_string_lossy();
+    test_statusline(r#":echo %"#, &cwd, Severity::Info).await?;
+    test_statusline(r#":echo %sh{echo "%"}"#, &cwd, Severity::Info).await?;
+    test_statusline(r#":echo %sh{echo 10%%}"#, "10%", Severity::Info).await?;
     Ok(())
 }

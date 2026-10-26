@@ -35,7 +35,7 @@ space.B = ":echo %sh{git blame -L %{cursor_line},+1 %{buffer_name}}"
 
 Expansions take the form `%[<kind>]<open><contents><close>`. In `%sh{echo hi!}`, for example, the kind is `sh` - the shell expansion - and the contents are "echo hi!", with `{` and `}` acting as opening and closing delimiters. The following open/close characters are recognized as expansion delimiter pairs: `(`/`)`, `[`/`]`, `{`/`}` and `<`/`>`. Plus the single characters `'`, `"` or `|` may be used instead: `%{cursor_line}` is equivalent to `%<cursor_line>`, `%[cursor_line]` or `%|cursor_line|`.
 
-To escape a percent character instead of treating it as an expansion, use two percent characters consecutively. To execute a shell command like `date -u +'%Y-%m-%d'`, double the percent characters: `:echo %sh{date -u +'%%Y-%%m-%%d'}`.
+To escape a percent character instead of treating it as an expansion, use two percent characters consecutively. A lone `%` is not an error but the current file's path, see below. To execute a shell command like `date -u +'%Y-%m-%d'`, double the percent characters: `:echo %sh{date -u +'%%Y-%%m-%%d'}`.
 
 When no `<kind>` is provided, Helix will expand a **variable**. For example `%{cursor_line}` can be used as in argument to insert the line number. `:echo %{cursor_line}` for instance may print `1` to the statusline.
 
@@ -56,6 +56,8 @@ The following variables are supported:
 | `selection_line_end` | `%E` | The line number of the end of the primary selection in the currently focused document, starting at 1. |
 
 Every variable also has a single-letter short name. It can be used bare, without delimiters, as in `%f`, or inside delimiters, as in `%{f}`. The delimited form is needed when a letter directly follows the alias: `%{f}x` rather than `%fx`. For example `:sh gcc %f -o %{d}/out` compiles the current file.
+
+A lone `%`, one not followed by a letter, `%` or delimiter, is short for `%f`, the file path, as is `%` within matching quotes like `"%"`. For example `:sh gcc % -o %.o` or `:sh ls -l "%"`.
 
 Aside from editor variables, the following expansions may be used:
 
