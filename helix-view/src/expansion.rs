@@ -4,6 +4,8 @@ use helix_core::command_line::{ExpansionKind, Token, TokenKind, Tokenizer};
 
 use anyhow::{anyhow, bail, ensure, Result};
 
+use helix_stdx::shell::ShellKind;
+
 use crate::Editor;
 
 /// Variables that can be expanded in the command mode (`:`) via the expansion syntax.
@@ -134,7 +136,7 @@ pub fn expand<'a>(editor: &Editor, token: Token<'a>) -> Result<Cow<'a, str>> {
         TokenKind::Unquoted | TokenKind::Quoted(_) => Ok(token.content),
         // A bare `%q` is the shell-quoted selection.
         TokenKind::Expansion(ExpansionKind::Variable) if token.content == "q" => Ok(Cow::Owned(
-            shell_quote(&expand_variable(editor, Variable::Selection)?),
+            shell_quote(editor, &expand_variable(editor, Variable::Selection)?),
         )),
         TokenKind::Expansion(ExpansionKind::Variable) => {
             let var = Variable::from_name(&token.content)
@@ -146,7 +148,7 @@ pub fn expand<'a>(editor: &Editor, token: Token<'a>) -> Result<Cow<'a, str>> {
             let var = Variable::from_name(&token.content)
                 .ok_or_else(|| anyhow!("unknown variable '{}'", token.content))?;
 
-            Ok(Cow::Owned(shell_quote(&expand_variable(editor, var)?)))
+            Ok(Cow::Owned(shell_quote(editor, &expand_variable(editor, var)?)))
         }
         TokenKind::Expansion(ExpansionKind::Unicode) => {
             if let Some(ch) = u32::from_str_radix(token.content.as_ref(), 16)
@@ -171,10 +173,11 @@ pub fn expand<'a>(editor: &Editor, token: Token<'a>) -> Result<Cow<'a, str>> {
     }
 }
 
-/// Quote a string as a single argument for a POSIX shell, for example `it's` becomes
-/// `'it'\''s'`.
-fn shell_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', r"'\''"))
+/// Quote a string as a single argument for the configured shell.
+fn shell_quote(editor: &Editor, s: &str) -> String {
+    let config = editor.config();
+    let program = config.shell.first().map_or("sh", String::as_str);
+    ShellKind::detect(program).quote(s)
 }
 
 /// Expand a shell command.
@@ -187,10 +190,16 @@ pub fn expand_shell<'a>(editor: &Editor, content: Cow<'a, str>) -> Result<Cow<'a
     let config = editor.config();
     let shell = &config.shell;
     let mut process = Command::new(&shell[0]);
-    process
-        .args(&shell[1..])
-        .arg(content.as_ref())
-        .stdin(Stdio::null())
+    process.args(&shell[1..]);
+    match ShellKind::detect(&shell[0]).verbatim_command(&content) {
+        #[cfg(windows)]
+        Some(command) => {
+            use std::os::windows::process::CommandExt;
+            process.raw_arg(command)
+        }
+        _ => process.arg(content.as_ref()),
+    }
+    .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 

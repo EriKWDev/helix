@@ -6587,10 +6587,13 @@ async fn shell_impl_async(
     ensure!(!shell.is_empty(), "No shell set");
 
     let mut process = Command::new(&shell[0]);
-    process
-        .args(&shell[1..])
-        .arg(cmd)
-        .stdout(Stdio::piped())
+    process.args(&shell[1..]);
+    match helix_stdx::shell::ShellKind::detect(&shell[0]).verbatim_command(cmd) {
+        #[cfg(windows)]
+        Some(command) => process.raw_arg(command),
+        _ => process.arg(cmd),
+    }
+    .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
     if input.is_some() || cfg!(windows) {
