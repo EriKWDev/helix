@@ -1591,9 +1591,8 @@ fn reload(cx: &mut compositor::Context, _args: Args, event: PromptEvent) -> anyh
     }
 
     let scrolloff = cx.editor.config().scrolloff;
-    let trust_full = doc_trust_full(cx.editor);
     let (view, doc) = current!(cx.editor);
-    doc.reload(view, &cx.editor.diff_providers, trust_full)
+    doc.reload(view, &cx.editor.diff_providers)
         .map(|_| {
             view.ensure_cursor_in_view(doc, scrolloff);
         })?;
@@ -1638,16 +1637,7 @@ fn reload_all(cx: &mut compositor::Context, _args: Args, event: PromptEvent) -> 
         // Ensure that the view is synced with the document's history.
         view.sync_changes(doc);
 
-        // Per-document trust: each doc's workspace may differ.
-        let trust_full = cx
-            .editor
-            .workspace_trust
-            .query(
-                doc.workspace_root(),
-                helix_loader::workspace_trust::TrustQuery::Git,
-            )
-            .is_trusted();
-        if let Err(error) = doc.reload(view, &cx.editor.diff_providers, trust_full) {
+        if let Err(error) = doc.reload(view, &cx.editor.diff_providers) {
             cx.editor.set_error(format!("{}", error));
             continue;
         }
@@ -4085,30 +4075,6 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
             ..Signature::DEFAULT
         },
     },
-    TypableCommand {
-        name: "workspace-trust",
-        aliases: &[],
-        doc: "Allow language servers and local config for the current workspace.",
-        fun: trust_workspace,
-        completer: CommandCompleter::none(),
-        signature: Signature { positionals: (0, None), ..Signature::DEFAULT },
-    },
-    TypableCommand {
-        name: "workspace-untrust",
-        aliases: &[],
-        doc: "Revoke the current workspace's trust grant or exclusion.",
-        fun: untrust_workspace,
-        completer: CommandCompleter::none(),
-        signature: Signature { positionals: (0, None), ..Signature::DEFAULT },
-    },
-    TypableCommand {
-        name: "workspace-exclude",
-        aliases: &[],
-        doc: "Mark the current workspace as never-prompt. Never prompts for trust again.",
-        fun: exclude_workspace,
-        completer: CommandCompleter::none(),
-        signature: Signature { positionals: (0, None), ..Signature::DEFAULT },
-    }
 ];
 
 pub static TYPABLE_COMMAND_MAP: LazyLock<HashMap<&'static str, &'static TypableCommand>> =
@@ -4537,72 +4503,4 @@ fn complete_expansion_kind(content: &str, offset: usize) -> Vec<ui::prompt::Comp
     .into_iter()
     .map(|(name, _)| (offset.., (*name).into()))
     .collect()
-}
-
-fn current_workspace(cx: &compositor::Context) -> std::path::PathBuf {
-    let (_, doc) = current_ref!(cx.editor);
-    doc.workspace_root().to_path_buf()
-}
-
-/// Whether the currently focused document's workspace is trusted for git operations (gix
-/// `Trust::Full`).
-fn doc_trust_full(editor: &helix_view::Editor) -> bool {
-    let (_, doc) = current_ref!(editor);
-    editor
-        .workspace_trust
-        .query(
-            doc.workspace_root(),
-            helix_loader::workspace_trust::TrustQuery::Git,
-        )
-        .is_trusted()
-}
-
-fn trust_workspace(
-    cx: &mut compositor::Context,
-    args: Args<'_>,
-    event: PromptEvent,
-) -> anyhow::Result<()> {
-    if event != PromptEvent::Validate {
-        return Ok(());
-    }
-
-    let workspace = current_workspace(cx);
-    cx.editor.workspace_trust.trust(&workspace);
-
-    cx.editor.config_events.0.send(ConfigEvent::Refresh)?;
-    // Restart any LSPs that didn't start because trust was missing.
-    lsp_restart(cx, args, event)
-}
-
-fn untrust_workspace(
-    cx: &mut compositor::Context,
-    _args: Args<'_>,
-    event: PromptEvent,
-) -> anyhow::Result<()> {
-    if event != PromptEvent::Validate {
-        return Ok(());
-    }
-
-    let workspace = current_workspace(cx);
-    cx.editor.workspace_trust.untrust(&workspace);
-    // Drop any workspace overrides that were merged into the live editor config while trust was
-    // granted. Running LSPs are not stopped here (use `:lsp-stop` for that); this only handles
-    // in-memory config.
-    cx.editor.config_events.0.send(ConfigEvent::Refresh)?;
-    Ok(())
-}
-
-fn exclude_workspace(
-    cx: &mut compositor::Context,
-    _args: Args<'_>,
-    event: PromptEvent,
-) -> anyhow::Result<()> {
-    if event != PromptEvent::Validate {
-        return Ok(());
-    }
-
-    let workspace = current_workspace(cx);
-    cx.editor.workspace_trust.exclude(&workspace);
-    cx.editor.config_events.0.send(ConfigEvent::Refresh)?;
-    Ok(())
 }

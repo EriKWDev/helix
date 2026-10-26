@@ -17,7 +17,6 @@
   - [Commands](./commands.md)
   - [Language servers](./lsp.md)
   - [Language support](./lang-support.md)
-  - [Workspace trust](./workspace-trust.md)
 - [Ecosystem](./ecosystem.md)
   - [Migrating from Vim](./from-vim.md)
   - [Helix mode in other software](./other-software.md)

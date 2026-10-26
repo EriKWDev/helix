@@ -7,11 +7,10 @@ use std::{
 
 use anyhow::bail;
 use helix_core::{diagnostic::Severity, test, Selection, Transaction};
-use helix_loader::workspace_trust::WorkspaceTrust;
 use helix_term::{application::Application, args::Args, config::Config, keymap::merge_keys};
 use helix_view::{
     current_ref, doc,
-    editor::{ImplicitTrustLevelConfig, LspConfig, WordCompletion, WorkspaceTrustConfig},
+    editor::{LspConfig, WordCompletion},
     input::parse_macro,
     Editor,
 };
@@ -207,7 +206,6 @@ pub async fn test_key_sequence_with_input_text<T: Into<TestCase>>(
             Args::default(),
             test_config(),
             test_syntax_loader(None),
-            WorkspaceTrust::fully_trusted(),
         )?,
     };
 
@@ -317,11 +315,6 @@ pub fn test_editor_config() -> helix_view::editor::Config {
             enable: false,
             ..Default::default()
         },
-        // Trust everything implicitly so tests don't hit popups.
-        workspace_trust: WorkspaceTrustConfig {
-            level: ImplicitTrustLevelConfig::Insecure,
-            ..Default::default()
-        },
         ..Default::default()
     }
 }
@@ -416,7 +409,6 @@ impl AppBuilder {
             self.args,
             self.config,
             self.syn_loader,
-            WorkspaceTrust::fully_trusted(),
         )?;
 
         if let Some((text, selection)) = self.input {

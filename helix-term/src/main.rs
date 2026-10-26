@@ -130,11 +130,7 @@ FLAGS:
         }
     };
 
-    let workspace_trust =
-        helix_loader::workspace_trust::WorkspaceTrust::new((&config.editor.workspace_trust).into());
-
-    let lang_loader =
-        helix_core::config::user_lang_loader(&workspace_trust).unwrap_or_else(|err| {
+    let lang_loader = helix_core::config::user_lang_loader().unwrap_or_else(|err| {
             eprintln!("{}", err);
             eprintln!("Press <ENTER> to continue with default language config");
             use std::io::Read;
@@ -144,7 +140,7 @@ FLAGS:
         });
 
     // TODO: use the thread local executor to spawn the application task separately from the work pool
-    let mut app = Application::new(args, config, lang_loader, workspace_trust)
+    let mut app = Application::new(args, config, lang_loader)
         .context("unable to start Helix")?;
     let mut events = app.event_stream();
 

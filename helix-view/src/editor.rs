@@ -15,7 +15,6 @@ use crate::{
     Document, DocumentId, View, ViewId,
 };
 use helix_event::dispatch;
-use helix_loader::workspace_trust::{ImplicitTrustLevel, TrustQuery, WorkspaceTrust};
 use helix_vcs::DiffProviderRegistry;
 
 use futures_util::stream::select_all::SelectAll;
@@ -432,67 +431,6 @@ pub struct Config {
     /// Whether to enable Kitty Keyboard Protocol
     pub kitty_keyboard_protocol: KittyKeyboardProtocolConfig,
     pub buffer_picker: BufferPickerConfig,
-    /// Workspace-trust configuration.
-    pub workspace_trust: WorkspaceTrustConfig,
-}
-
-/// User-facing configuration for `[editor.workspace-trust]`.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
-pub struct WorkspaceTrustConfig {
-    /// What to trust implicitly without an explicit grant. See [`ImplicitTrustLevelConfig`].
-    pub level: ImplicitTrustLevelConfig,
-    /// Whether opening a file in an untrusted workspace surfaces the trust modal. The statusline
-    /// `[⚠]` indicator is always shown either way; disabling the prompt is for users who would
-    /// rather act explicitly via `:workspace-trust` than be interrupted. Defaults to `true`.
-    pub prompt: bool,
-    /// Glob patterns whose matching workspaces are implicitly trusted.
-    pub trusted: Vec<String>,
-}
-
-impl Default for WorkspaceTrustConfig {
-    fn default() -> Self {
-        Self {
-            level: ImplicitTrustLevelConfig::default(),
-            prompt: true,
-            trusted: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize, Clone, Copy)]
-#[serde(rename_all = "kebab-case")]
-pub enum ImplicitTrustLevelConfig {
-    /// Don't trust anything implicitly — prompt for every new workspace.
-    None,
-    /// Trust Helix-launched server processes (LSP and DAP) implicitly. Workspace-local config and
-    /// git full-trust still require explicit `:workspace-trust`. This is the default — language
-    /// servers are configured globally, so auto-starting them in fresh workspaces matches user
-    /// expectations while the workspace-controlled `.helix/` config still requires opt-in.
-    #[default]
-    Servers,
-    /// Trust everything implicitly. Explicit excludes still win.
-    Insecure,
-}
-
-impl From<ImplicitTrustLevelConfig> for ImplicitTrustLevel {
-    fn from(v: ImplicitTrustLevelConfig) -> Self {
-        match v {
-            ImplicitTrustLevelConfig::None => ImplicitTrustLevel::None,
-            ImplicitTrustLevelConfig::Servers => ImplicitTrustLevel::Servers,
-            ImplicitTrustLevelConfig::Insecure => ImplicitTrustLevel::Insecure,
-        }
-    }
-}
-
-impl From<&WorkspaceTrustConfig> for helix_loader::workspace_trust::Config {
-    fn from(v: &WorkspaceTrustConfig) -> Self {
-        Self {
-            level: v.level.into(),
-            prompt: v.prompt,
-            trusted_globs: helix_loader::workspace_trust::build_trusted_globs(&v.trusted),
-        }
-    }
 }
 
 impl Config {
@@ -1239,7 +1177,6 @@ impl Default for Config {
             rainbow_brackets: false,
             kitty_keyboard_protocol: Default::default(),
             buffer_picker: BufferPickerConfig::default(),
-            workspace_trust: WorkspaceTrustConfig::default(),
         }
     }
 }
@@ -1342,7 +1279,6 @@ pub struct Editor {
 
     pub mouse_down_range: Option<Range>,
     pub cursor_cache: CursorCache,
-    pub workspace_trust: WorkspaceTrust,
 }
 
 pub type Motion = Box<dyn Fn(&mut Editor)>;
@@ -1416,7 +1352,6 @@ impl Editor {
         syn_loader: Arc<ArcSwap<syntax::Loader>>,
         config: Arc<dyn DynAccess<Config>>,
         handlers: Handlers,
-        workspace_trust: WorkspaceTrust,
     ) -> Self {
         let language_servers = helix_lsp::Registry::new(syn_loader.clone());
         let conf = config.load();
@@ -1467,7 +1402,6 @@ impl Editor {
             mouse_down_range: None,
             cursor_cache: CursorCache::default(),
             dir_stack: VecDeque::with_capacity(DIR_STACK_CAP),
-            workspace_trust,
         }
     }
 
@@ -1828,12 +1762,6 @@ impl Editor {
         let config = doc.config.load();
         let root_dirs = &config.workspace_lsp_roots;
 
-        let workspace = doc.workspace_root();
-        let trust = self.workspace_trust.query(workspace, TrustQuery::Lsp);
-        if !trust.is_trusted() {
-            return;
-        }
-
         // store only successfully started language servers
         let language_servers = lang.as_ref().map_or_else(HashMap::default, |language| {
             self.language_servers
@@ -2118,16 +2046,10 @@ impl Editor {
                 Editor::doc_diagnostics(&self.language_servers, &self.diagnostics, &doc);
             doc.replace_diagnostics(diagnostics, &[], None);
 
-            let trust_full = self
-                .workspace_trust
-                .query(doc.workspace_root(), TrustQuery::Git)
-                .is_trusted();
-            if let Some(diff_base) = self.diff_providers.get_diff_base(&path, trust_full) {
+            if let Some(diff_base) = self.diff_providers.get_diff_base(&path) {
                 doc.set_diff_base(diff_base);
             }
-            doc.set_version_control_head(
-                self.diff_providers.get_current_head_name(&path, trust_full),
-            );
+            doc.set_version_control_head(self.diff_providers.get_current_head_name(&path));
 
             let id = self.new_document(doc);
             self.launch_language_servers(id);

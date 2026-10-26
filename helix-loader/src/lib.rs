@@ -1,6 +1,5 @@
 pub mod config;
 pub mod grammar;
-pub mod workspace_trust;
 
 use helix_stdx::{env::current_working_dir, path};
 
@@ -129,13 +128,6 @@ pub fn cache_dir() -> PathBuf {
     // TODO: allow env var override
     let strategy = choose_base_strategy().expect("Unable to find the cache directory!");
     let mut path = strategy.cache_dir();
-    path.push("helix");
-    path
-}
-
-pub fn data_dir() -> PathBuf {
-    let strategy = choose_base_strategy().expect("Unable to find the data directory!");
-    let mut path = strategy.data_dir();
     path.push("helix");
     path
 }

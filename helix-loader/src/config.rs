@@ -1,7 +1,5 @@
 use std::str::from_utf8;
 
-use crate::workspace_trust::{TrustQuery, WorkspaceTrust};
-
 /// Default built-in languages.toml.
 pub fn default_lang_config() -> toml::Value {
     let default_config = include_bytes!("../../languages.toml");
@@ -10,20 +8,11 @@ pub fn default_lang_config() -> toml::Value {
 }
 
 /// User configured languages.toml file, merged with the default config.
-///
-/// Workspace-local `.helix/languages.toml` is merged in only when the current
-/// workspace is trusted for [`TrustQuery::LocalConfig`].
-pub fn user_lang_config(trust: &WorkspaceTrust) -> Result<toml::Value, toml::de::Error> {
-    let global_config = crate::lang_config_file();
-    let workspace_config = crate::workspace_lang_config_file();
-
-    let files = if trust.query_current(TrustQuery::LocalConfig).is_trusted() {
-        vec![global_config, workspace_config]
-    } else {
-        vec![global_config]
-    };
-
-    let config = files
+pub fn user_lang_config() -> Result<toml::Value, toml::de::Error> {
+    let config = [
+        crate::lang_config_file(),
+        crate::workspace_lang_config_file(),
+    ]
         .iter()
         .filter_map(|file| {
             std::fs::read_to_string(file)
