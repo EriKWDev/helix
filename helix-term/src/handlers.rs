@@ -15,7 +15,6 @@ pub use helix_view::handlers::{word_index, Handlers};
 use self::document_colors::DocumentColorsHandler;
 use self::document_links::DocumentLinksHandler;
 
-pub(crate) mod hot;
 mod auto_save;
 mod code_action_hint;
 pub mod completion;
@@ -23,6 +22,7 @@ pub mod diagnostics;
 mod document_colors;
 mod document_highlight;
 mod document_links;
+pub(crate) mod hot;
 mod prompt;
 mod signature_help;
 mod snippet;

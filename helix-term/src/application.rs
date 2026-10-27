@@ -91,11 +91,7 @@ fn setup_integration_logging() {
 }
 
 impl Application {
-    pub fn new(
-        args: Args,
-        config: Config,
-        lang_loader: syntax::Loader,
-    ) -> Result<Self, Error> {
+    pub fn new(args: Args, config: Config, lang_loader: syntax::Loader) -> Result<Self, Error> {
         #[cfg(feature = "integration")]
         setup_integration_logging();
 

@@ -1600,10 +1600,9 @@ fn reload(cx: &mut compositor::Context, _args: Args, event: PromptEvent) -> anyh
 
     let scrolloff = cx.editor.config().scrolloff;
     let (view, doc) = current!(cx.editor);
-    doc.reload(view, &cx.editor.diff_providers)
-        .map(|_| {
-            view.ensure_cursor_in_view(doc, scrolloff);
-        })?;
+    doc.reload(view, &cx.editor.diff_providers).map(|_| {
+        view.ensure_cursor_in_view(doc, scrolloff);
+    })?;
     if let Some(path) = doc.path().map(ToOwned::to_owned) {
         cx.editor
             .language_servers

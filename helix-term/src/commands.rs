@@ -6594,7 +6594,18 @@ async fn shell_impl_async(
         _ => process.arg(cmd),
     }
     .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    .stderr(Stdio::piped());
+
+    // Run the shell in its own session, without a controlling terminal. Otherwise an interactive
+    // shell (`shell = ["zsh", "-ic"]`) takes the terminal's foreground for job control, and Helix
+    // is stopped by SIGTTIN as soon as it reads input while the command runs.
+    #[cfg(unix)]
+    unsafe {
+        process.pre_exec(|| match libc::setsid() {
+            -1 => Err(std::io::Error::last_os_error()),
+            _ => Ok(()),
+        });
+    }
 
     if input.is_some() || cfg!(windows) {
         process.stdin(Stdio::piped());

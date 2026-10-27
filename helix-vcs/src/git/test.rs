@@ -64,10 +64,7 @@ fn unmodified_file() {
     let contents = b"foo".as_slice();
     File::create(&file).unwrap().write_all(contents).unwrap();
     create_commit(temp_git.path(), true);
-    assert_eq!(
-        git::get_diff_base(&file).unwrap(),
-        Vec::from(contents)
-    );
+    assert_eq!(git::get_diff_base(&file).unwrap(), Vec::from(contents));
 }
 
 #[test]
@@ -79,10 +76,7 @@ fn modified_file() {
     create_commit(temp_git.path(), true);
     File::create(&file).unwrap().write_all(b"bar").unwrap();
 
-    assert_eq!(
-        git::get_diff_base(&file).unwrap(),
-        Vec::from(contents)
-    );
+    assert_eq!(git::get_diff_base(&file).unwrap(), Vec::from(contents));
 }
 
 /// Test that `get_file_head` does not return content for a directory.

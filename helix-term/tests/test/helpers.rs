@@ -202,11 +202,7 @@ pub async fn test_key_sequence_with_input_text<T: Into<TestCase>>(
 
     let mut app = match app {
         Some(app) => app,
-        None => Application::new(
-            Args::default(),
-            test_config(),
-            test_syntax_loader(None),
-        )?,
+        None => Application::new(Args::default(), test_config(), test_syntax_loader(None))?,
     };
 
     let (view, doc) = helix_view::current!(app.editor);
@@ -405,11 +401,7 @@ impl AppBuilder {
             bail!("Having the directory {path:?} in args.files[0] is not yet supported for integration tests");
         }
 
-        let mut app = Application::new(
-            self.args,
-            self.config,
-            self.syn_loader,
-        )?;
+        let mut app = Application::new(self.args, self.config, self.syn_loader)?;
 
         if let Some((text, selection)) = self.input {
             let (view, doc) = helix_view::current!(app.editor);

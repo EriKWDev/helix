@@ -133,10 +133,7 @@ mod tests {
             ShellKind::Fish.quote(s),
             r#"'it\'s "$HOME" \\ 100% & more'"#
         );
-        assert_eq!(
-            ShellKind::Nu.quote(s),
-            r#"r#'it's "$HOME" \ 100% & more'#"#
-        );
+        assert_eq!(ShellKind::Nu.quote(s), r#"r#'it's "$HOME" \ 100% & more'#"#);
         assert_eq!(ShellKind::Nu.quote("a'#b"), "r##'a'#b'##");
         assert_eq!(
             ShellKind::PowerShell.quote(s),

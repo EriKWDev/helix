@@ -148,7 +148,10 @@ pub fn expand<'a>(editor: &Editor, token: Token<'a>) -> Result<Cow<'a, str>> {
             let var = Variable::from_name(&token.content)
                 .ok_or_else(|| anyhow!("unknown variable '{}'", token.content))?;
 
-            Ok(Cow::Owned(shell_quote(editor, &expand_variable(editor, var)?)))
+            Ok(Cow::Owned(shell_quote(
+                editor,
+                &expand_variable(editor, var)?,
+            )))
         }
         TokenKind::Expansion(ExpansionKind::Unicode) => {
             if let Some(ch) = u32::from_str_radix(token.content.as_ref(), 16)
@@ -200,8 +203,20 @@ pub fn expand_shell<'a>(editor: &Editor, content: Cow<'a, str>) -> Result<Cow<'a
         _ => process.arg(content.as_ref()),
     }
     .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped());
+
+    // Run the shell without a controlling terminal so that an interactive shell can't take the
+    // terminal away from Helix. See `shell_impl_async` in helix-term.
+    #[cfg(unix)]
+    unsafe {
+        use std::os::unix::process::CommandExt;
+
+        process.pre_exec(|| match libc::setsid() {
+            -1 => Err(std::io::Error::last_os_error()),
+            _ => Ok(()),
+        });
+    }
 
     // TODO: there is no protection here against a shell command taking a long time.
     // Ideally you should be able to hit `<ret>` in command mode and then be able to
