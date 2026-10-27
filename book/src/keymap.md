@@ -176,6 +176,7 @@ These sub-modes are accessible from normal mode and typically switch back to nor
 | `g`      | Enter [goto mode](#goto-mode)                      | N/A            |
 | `m`      | Enter [match mode](#match-mode)                    | N/A            |
 | `:`      | Enter command mode                                 | `command_mode` |
+| `#`, `F5` | Compile and run the current project (see `:set-run-command`) | `compile_and_run` |
 | `z`      | Enter [view mode](#view-mode)                      | N/A            |
 | `Z`      | Enter sticky [view mode](#view-mode)               | N/A            |
 | `Ctrl-w` | Enter [window mode](#window-mode)                  | N/A            |

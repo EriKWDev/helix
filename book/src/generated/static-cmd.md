@@ -301,6 +301,7 @@
 | `shell_append_output` | Append shell command output after selections | normal: `` <A-!> ``, select: `` <A-!> `` |
 | `shell_keep_pipe` | Filter selections with shell predicate | normal: `` $ ``, select: `` $ `` |
 | `suspend` | Suspend and return to shell | normal: `` <C-z> ``, select: `` <C-z> `` |
+| `compile_and_run` | Compile and run the current project (see :set-run-command) | normal: `` # ``, `` <F5> ``, select: `` # ``, `` <F5> `` |
 | `rename_symbol` | Rename symbol | normal: `` <space>r ``, select: `` <space>r `` |
 | `increment` | Increment item under cursor | normal: `` <C-a> ``, select: `` <C-a> `` |
 | `decrement` | Decrement item under cursor | normal: `` <C-x> ``, select: `` <C-x> `` |

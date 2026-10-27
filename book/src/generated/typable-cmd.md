@@ -88,6 +88,8 @@
 | `:pipe`, `:\|` | Pipe each selection to the shell command. |
 | `:pipe-to` | Pipe each selection to the shell command, ignoring output. |
 | `:run-shell-command`, `:sh`, `:!`, `:/` | Run a shell command |
+| `:set-run-command`, `:sr` | Set the shell command that `:run` uses to compile and run the current project, for this session. Expansions like `%f` are evaluated when it runs. Without arguments, edit the current one; `--clear` goes back to editor.run-commands. |
+| `:run`, `:cr`, `:compile-and-run` | Compile and run the current project with the command from `:set-run-command`, or from editor.run-commands for the file's extension or language. |
 | `:reset-diff-change`, `:diffget`, `:diffg` | Reset the diff change at the cursor position. |
 | `:clear-register` | Clear given register. If no argument is provided, clear all registers. |
 | `:set-register` | Set contents of the given register. |

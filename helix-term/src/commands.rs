@@ -604,6 +604,7 @@ impl MappableCommand {
         shell_append_output, "Append shell command output after selections",
         shell_keep_pipe, "Filter selections with shell predicate",
         suspend, "Suspend and return to shell",
+        compile_and_run, "Compile and run the current project (see :set-run-command)",
         rename_symbol, "Rename symbol",
         increment, "Increment item under cursor",
         decrement, "Decrement item under cursor",
@@ -3573,7 +3574,19 @@ fn changed_file_picker(cx: &mut Context) {
     cx.push_layer(Box::new(overlaid(picker)));
 }
 
-pub fn command_palette(cx: &mut Context) {
+pub fn compile_and_run(cx: &mut Context) {
+    let mut cx = compositor::Context {
+        editor: cx.editor,
+        jobs: cx.jobs,
+        scroll: None,
+    };
+    let cmd = typed::TYPABLE_COMMAND_MAP.get("run").unwrap();
+    if let Err(err) = typed::execute_command(&mut cx, cmd, "", PromptEvent::Validate) {
+        cx.editor.set_error(err.to_string());
+    }
+}
+
+fn command_palette(cx: &mut Context) {
     let register = cx.register;
     let count = cx.count;
 

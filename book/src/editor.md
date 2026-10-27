@@ -23,6 +23,7 @@
 - [`[editor.smart-tab]` Section](#editorsmart-tab-section)
 - [`[editor.inline-diagnostics]` Section](#editorinline-diagnostics-section)
 - [`[editor.word-completion]` Section](#editorword-completion-section)
+- [`[editor.run-commands]` Section](#editorrun-commands-section)
 
 ### `[editor]` Section
 
@@ -535,4 +536,23 @@ Example:
 enable = true
 # Set the trigger length lower so that words are completed more often
 trigger-length = 4
+```
+
+### `[editor.run-commands]` Section
+
+Shell commands that compile and run the current project, used by `:run` (`:cr`), which is
+bound to `#` and `F5` in normal mode. The command is picked by the focused file's extension
+or, failing that, its language name. Expansions like `%f` (the file path, also written as a
+lone `%`) are evaluated when the command runs. See [command line](./command-line.md#expansions).
+
+`:set-run-command` (`:sr`) overrides this for the rest of the session: `:sr make -j8` sets
+the command, `:sr` alone opens it for editing, and `:sr --clear` goes back to this section.
+
+```toml
+[editor.run-commands]
+rs = "cargo run"
+md = "md %f"
+py = "python3 %"
+# By language name instead of extension:
+javascript = "node %"
 ```

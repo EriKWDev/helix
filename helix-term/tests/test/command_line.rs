@@ -182,3 +182,79 @@ async fn percent_escaping() -> anyhow::Result<()> {
     test_statusline(r#":echo %sh{echo 10%%}"#, "10%", Severity::Info).await?;
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn run_command() -> anyhow::Result<()> {
+    test_statusline(
+        ":run",
+        "'run': No run command for this file. Set one with `:sr <command>` or in [editor.run-commands]",
+        Severity::Error,
+    )
+    .await?;
+
+    // The command is stored as written, to be expanded when it runs.
+    test_key_sequence(
+        &mut AppBuilder::new().build()?,
+        Some(":sr echo %f % \"%{cursor_line}\"<ret>"),
+        Some(&|app| {
+            assert_eq!(
+                app.editor.run_command.as_deref(),
+                Some(r#"echo %f % "%{cursor_line}""#)
+            );
+        }),
+        false,
+    )
+    .await?;
+
+    test_key_sequence(
+        &mut AppBuilder::new().build()?,
+        Some(":sr echo hi<ret>:sr --clear<ret>"),
+        Some(&|app| {
+            assert_eq!(app.editor.run_command, None);
+            let (status, _) = app.editor.get_status().unwrap();
+            assert_eq!(status, "Run command cleared");
+        }),
+        false,
+    )
+    .await?;
+
+    // `#` runs it, expanding variables first.
+    test_key_sequence(
+        &mut AppBuilder::new().build()?,
+        Some(":sr echo %l<ret>#"),
+        Some(&|app| {
+            let (status, severity) = app.editor.get_status().unwrap();
+            assert_eq!(*severity, Severity::Info);
+            assert!(status.ends_with(": echo 1"), "{status}");
+        }),
+        false,
+    )
+    .await?;
+
+    // Without `:set-run-command` the command comes from `editor.run-commands`.
+    let file = tempfile::Builder::new().suffix(".md").tempfile()?;
+    let mut config = test_config();
+    config
+        .editor
+        .run_commands
+        .insert("md".to_string(), "echo %l".to_string());
+    test_key_sequence(
+        &mut AppBuilder::new()
+            .with_file(file.path(), None)
+            .with_config(config)
+            .build()?,
+        Some(":run<ret>"),
+        Some(&|app| {
+            assert_eq!(
+                app.editor.run_command(),
+                Some(("echo %l".to_string(), "editor.run-commands.md".to_string()))
+            );
+            let (status, _) = app.editor.get_status().unwrap();
+            assert!(status.ends_with(": echo 1"), "{status}");
+        }),
+        false,
+    )
+    .await?;
+
+    Ok(())
+}

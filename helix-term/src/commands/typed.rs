@@ -2655,11 +2655,17 @@ fn run_shell_command(
         return Ok(());
     }
 
+    spawn_shell_command(cx, args.join(" "), "Command run".to_string());
+    Ok(())
+}
+
+/// Runs `command` with the configured shell in the background, showing its output in a popup
+/// and `status` in the statusline once it finishes.
+fn spawn_shell_command(cx: &mut compositor::Context, command: String, status: String) {
     let shell = cx.editor.config().shell.clone();
-    let args = args.join(" ");
 
     let callback = async move {
-        let output = shell_impl_async(&shell, &args, None).await?;
+        let output = shell_impl_async(&shell, &command, None).await?;
         let call: job::Callback = Callback::EditorCompositor(Box::new(
             move |editor: &mut Editor, compositor: &mut Compositor| {
                 if !output.trim().is_empty() {
@@ -2672,13 +2678,74 @@ fn run_shell_command(
                     ));
                     compositor.replace_or_push("shell", popup);
                 }
-                editor.set_status("Command run");
+                editor.set_status(status);
             },
         ));
         Ok(call)
     };
     cx.jobs.callback(callback);
+}
 
+fn set_run_command(
+    cx: &mut compositor::Context,
+    args: Args,
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    if event != PromptEvent::Validate {
+        return Ok(());
+    }
+
+    // The whole argument is taken literally, so the `--clear` flag is checked by hand.
+    let command = args.first().unwrap_or_default().trim();
+    if matches!(command, "--clear" | "-c") {
+        cx.editor.run_command = None;
+        match cx.editor.run_command() {
+            Some((command, source)) => cx
+                .editor
+                .set_status(format!("Run command reset to {source}: {command}")),
+            None => cx.editor.set_status("Run command cleared"),
+        }
+        return Ok(());
+    }
+
+    if command.is_empty() {
+        // Open the command line with the current run command filled in to edit it.
+        let line = match cx.editor.run_command() {
+            Some((command, _)) => format!("set-run-command {command}"),
+            None => "set-run-command ".to_string(),
+        };
+        let callback = async move {
+            let call: job::Callback = Callback::EditorCompositor(Box::new(
+                move |editor: &mut Editor, compositor: &mut Compositor| {
+                    compositor.push(Box::new(command_line_prompt().with_line(line, editor)));
+                },
+            ));
+            Ok(call)
+        };
+        cx.jobs.callback(callback);
+        return Ok(());
+    }
+
+    cx.editor.set_status(format!("Run command set: {command}"));
+    cx.editor.run_command = Some(command.to_string());
+    Ok(())
+}
+
+fn compile_and_run(
+    cx: &mut compositor::Context,
+    _args: Args,
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    if event != PromptEvent::Validate {
+        return Ok(());
+    }
+
+    let Some((command, _)) = cx.editor.run_command() else {
+        bail!("No run command for this file. Set one with `:sr <command>` or in [editor.run-commands]");
+    };
+    let command = expansion::expand(cx.editor, Token::expand(command))?.into_owned();
+    cx.editor.set_status(format!("Running: {command}"));
+    spawn_shell_command(cx, command.clone(), format!("Ran: {command}"));
     Ok(())
 }
 
@@ -3983,6 +4050,30 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         signature: SHELL_SIGNATURE,
     },
     TypableCommand {
+        name: "set-run-command",
+        aliases: &["sr"],
+        doc: "Set the shell command that `:run` uses to compile and run the current project, for this session. Expansions like `%f` are evaluated when it runs. Without arguments, edit the current one; `--clear` goes back to editor.run-commands.",
+        fun: set_run_command,
+        completer: SHELL_COMPLETER,
+        signature: Signature {
+            positionals: (0, Some(1)),
+            raw_after: Some(0),
+            literal: true,
+            ..Signature::DEFAULT
+        },
+    },
+    TypableCommand {
+        name: "run",
+        aliases: &["cr", "compile-and-run"],
+        doc: "Compile and run the current project with the command from `:set-run-command`, or from editor.run-commands for the file's extension or language.",
+        fun: compile_and_run,
+        completer: CommandCompleter::none(),
+        signature: Signature {
+            positionals: (0, Some(0)),
+            ..Signature::DEFAULT
+        },
+    },
+    TypableCommand {
         name: "reset-diff-change",
         aliases: &["diffget", "diffg"],
         doc: "Reset the diff change at the cursor position.",
@@ -4135,7 +4226,10 @@ pub(super) fn execute_command(
     args: &str,
     event: PromptEvent,
 ) -> anyhow::Result<()> {
-    let args = if event == PromptEvent::Validate {
+    let args = if event == PromptEvent::Validate && cmd.signature.literal {
+        Args::parse(args, cmd.signature, true, |token| Ok(token.content))
+            .map_err(|err| anyhow!("'{}': {err}", cmd.name))?
+    } else if event == PromptEvent::Validate {
         Args::parse(args, cmd.signature, true, |token| {
             expansion::expand(cx.editor, token).map_err(|err| err.into())
         })
@@ -4150,6 +4244,15 @@ pub(super) fn execute_command(
 
 #[allow(clippy::unnecessary_unwrap)]
 pub(super) fn command_mode(cx: &mut Context) {
+    let mut prompt = command_line_prompt();
+
+    // Calculate initial completion
+    prompt.recalculate_completion(cx.editor);
+    cx.push_layer(Box::new(prompt));
+}
+
+/// The `:` command line prompt.
+fn command_line_prompt() -> Prompt {
     let mut prompt = Prompt::new(
         ":".into(),
         Some(':'),
@@ -4161,10 +4264,7 @@ pub(super) fn command_mode(cx: &mut Context) {
         },
     );
     prompt.doc_fn = Box::new(command_line_doc);
-
-    // Calculate initial completion
-    prompt.recalculate_completion(cx.editor);
-    cx.push_layer(Box::new(prompt));
+    prompt
 }
 
 fn command_line_doc(input: &str) -> Option<Cow<'_, str>> {

@@ -146,6 +146,11 @@ pub struct Signature {
     ///
     /// See the `Flag` struct for more info.
     pub flags: &'static [Flag],
+    /// Whether arguments are passed to the command as written, without evaluating expansions.
+    ///
+    /// For example `:set-run-command cargo run %f` stores `%f` itself, to be expanded only
+    /// when the command is run.
+    pub literal: bool,
     /// Do not set this field. Use `..Signature::DEFAULT` to construct a `Signature` instead.
     // This field allows adding new fields later with minimal code changes. This works like a
     // `#[non_exhaustive]` annotation except that it supports the `..Signature::DEFAULT`
@@ -160,6 +165,7 @@ impl Signature {
         positionals: (0, None),
         raw_after: None,
         flags: &[],
+        literal: false,
         _dummy: (),
     };
 

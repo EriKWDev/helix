@@ -62,6 +62,7 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
             "w" => goto_word,
         },
         ":" => command_mode,
+        "#" | "F5" => compile_and_run,
 
         "i" => insert_mode,
         "I" => insert_at_line_start,

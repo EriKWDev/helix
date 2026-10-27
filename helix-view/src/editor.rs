@@ -303,6 +303,10 @@ pub struct Config {
     pub mouse_yank_register: char,
     /// Shell to use for shell commands. Defaults to ["cmd", "/C"] on Windows and ["sh", "-c"] otherwise.
     pub shell: Vec<String>,
+    /// Shell commands that compile and run the current project, for `:run`. Keyed by the
+    /// focused file's extension (`rs`, `md`) or its language name (`rust`). Expansions like `%f`
+    /// are evaluated when the command runs.
+    pub run_commands: HashMap<String, String>,
     /// Line number mode.
     pub line_number: LineNumber,
     /// Highlight the lines cursors are currently on. Defaults to false.
@@ -1122,6 +1126,7 @@ impl Default for Config {
             } else {
                 vec!["sh".to_owned(), "-c".to_owned()]
             },
+            run_commands: HashMap::new(),
             line_number: LineNumber::Absolute,
             cursorline: false,
             cursorcolumn: false,
@@ -1279,6 +1284,9 @@ pub struct Editor {
 
     pub mouse_down_range: Option<Range>,
     pub cursor_cache: CursorCache,
+    /// The run command set for this session with `:set-run-command`. It takes precedence over
+    /// `editor.run-commands`.
+    pub run_command: Option<String>,
 }
 
 pub type Motion = Box<dyn Fn(&mut Editor)>;
@@ -1401,6 +1409,7 @@ impl Editor {
             handlers,
             mouse_down_range: None,
             cursor_cache: CursorCache::default(),
+            run_command: None,
             dir_stack: VecDeque::with_capacity(DIR_STACK_CAP),
         }
     }
@@ -1706,6 +1715,28 @@ impl Editor {
         }
         self.language_servers.file_event_handler.file_changed(path);
         Ok(())
+    }
+
+    /// The command `:run` executes for the focused document, unexpanded, along with where it
+    /// came from: the session's `:set-run-command` or the `editor.run-commands` key that matched.
+    pub fn run_command(&self) -> Option<(String, String)> {
+        if let Some(command) = &self.run_command {
+            return Some((command.clone(), "set-run-command".to_string()));
+        }
+        let config = self.config();
+        let doc = doc!(self);
+        let extension = doc
+            .path()
+            .and_then(|path| path.extension())
+            .map(|ext| ext.to_string_lossy().into_owned());
+        let keys = [extension, doc.language_name().map(str::to_owned)];
+        keys.into_iter().flatten().find_map(|key| {
+            let command = config
+                .run_commands
+                .get(&key)
+                .or_else(|| config.run_commands.get(&format!(".{key}")))?;
+            Some((command.clone(), format!("editor.run-commands.{key}")))
+        })
     }
 
     pub fn set_doc_path(&mut self, doc_id: DocumentId, path: &Path) {
