@@ -1802,70 +1802,89 @@ fn lsp_restart(cx: &mut compositor::Context, args: Args, event: PromptEvent) -> 
     }
 
     let editor_config = cx.editor.config.load();
-    let doc = doc!(cx.editor);
-    let config = doc
-        .language_config()
-        .context("LSP not defined for the current document")?;
+    // Scope the doc borrow so the editor can be borrowed mutably afterwards to drop the
+    // diagnostics of the old instances.
+    let (removed_ids, document_ids_to_refresh, errors) = {
+        let doc = doc!(cx.editor);
+        let config = doc
+            .language_config()
+            .context("LSP not defined for the current document")?;
 
-    let language_servers: Vec<_> = config
-        .language_servers
-        .iter()
-        .map(|ls| ls.name.as_str())
-        .collect();
-    let language_servers = if args.is_empty() {
-        language_servers
-    } else {
-        let (valid, invalid): (Vec<_>, Vec<_>) = args
+        let language_servers: Vec<_> = config
+            .language_servers
             .iter()
-            .map(|arg| arg.as_ref())
-            .partition(|name| language_servers.contains(name));
-        if !invalid.is_empty() {
-            let s = if invalid.len() == 1 { "" } else { "s" };
-            bail!("Unknown language server{s}: {}", invalid.join(", "));
+            .map(|ls| ls.name.as_str())
+            .collect();
+        let language_servers = if args.is_empty() {
+            language_servers
+        } else {
+            let (valid, invalid): (Vec<_>, Vec<_>) = args
+                .iter()
+                .map(|arg| arg.as_ref())
+                .partition(|name| language_servers.contains(name));
+            if !invalid.is_empty() {
+                let s = if invalid.len() == 1 { "" } else { "s" };
+                bail!("Unknown language server{s}: {}", invalid.join(", "));
+            }
+            valid
+        };
+
+        let mut errors = Vec::new();
+        let mut removed_ids = Vec::new();
+        for server in language_servers.iter() {
+            // The restarted instances are gone once the new ones start. Their diagnostics would
+            // otherwise linger forever since they can no longer retract them.
+            removed_ids.extend(
+                cx.editor
+                    .language_servers
+                    .clients_by_name(server)
+                    .map(|client| client.id()),
+            );
+            match cx
+                .editor
+                .language_servers
+                .restart_server(
+                    server,
+                    config,
+                    doc.path(),
+                    &editor_config.workspace_lsp_roots,
+                    editor_config.lsp.snippets,
+                )
+                .transpose()
+            {
+                // Ignore the executable-not-found error unless the server was explicitly requested
+                // in the arguments.
+                Err(helix_lsp::Error::ExecutableNotFound(_))
+                    if !args.iter().any(|arg| arg == server) => {}
+                Err(err) => errors.push(err.to_string()),
+                _ => (),
+            }
         }
-        valid
+
+        // This collect is needed because refresh_language_server would need to re-borrow editor.
+        let document_ids_to_refresh: Vec<DocumentId> = cx
+            .editor
+            .documents()
+            .filter_map(|doc| match doc.language_config() {
+                Some(config)
+                    if config.language_servers.iter().any(|ls| {
+                        language_servers
+                            .iter()
+                            .any(|restarted_ls| restarted_ls == &ls.name)
+                    }) =>
+                {
+                    Some(doc.id())
+                }
+                _ => None,
+            })
+            .collect();
+
+        (removed_ids, document_ids_to_refresh, errors)
     };
 
-    let mut errors = Vec::new();
-    for server in language_servers.iter() {
-        match cx
-            .editor
-            .language_servers
-            .restart_server(
-                server,
-                config,
-                doc.path(),
-                &editor_config.workspace_lsp_roots,
-                editor_config.lsp.snippets,
-            )
-            .transpose()
-        {
-            // Ignore the executable-not-found error unless the server was explicitly requested
-            // in the arguments.
-            Err(helix_lsp::Error::ExecutableNotFound(_))
-                if !args.iter().any(|arg| arg == server) => {}
-            Err(err) => errors.push(err.to_string()),
-            _ => (),
-        }
-    }
-
-    // This collect is needed because refresh_language_server would need to re-borrow editor.
-    let document_ids_to_refresh: Vec<DocumentId> = cx
-        .editor
-        .documents()
-        .filter_map(|doc| match doc.language_config() {
-            Some(config)
-                if config.language_servers.iter().any(|ls| {
-                    language_servers
-                        .iter()
-                        .any(|restarted_ls| restarted_ls == &ls.name)
-                }) =>
-            {
-                Some(doc.id())
-            }
-            _ => None,
-        })
-        .collect();
+    // The old instances are gone: their diagnostics can never be retracted by the server.
+    cx.editor
+        .clear_diagnostics_for_language_servers(&removed_ids, None);
 
     for document_id in document_ids_to_refresh {
         cx.editor.refresh_language_servers(document_id);
@@ -1905,7 +1924,14 @@ fn lsp_stop(cx: &mut compositor::Context, args: Args, event: PromptEvent) -> any
         valid
     };
 
+    let mut removed_ids = Vec::new();
     for ls_name in &language_servers {
+        removed_ids.extend(
+            cx.editor
+                .language_servers
+                .clients_by_name(ls_name)
+                .map(|client| client.id()),
+        );
         cx.editor.language_servers.stop(ls_name);
 
         for doc in cx.editor.documents_mut() {
@@ -1916,6 +1942,10 @@ fn lsp_stop(cx: &mut compositor::Context, args: Args, event: PromptEvent) -> any
             }
         }
     }
+
+    // Drop the stopped instances' diagnostics from the workspace-wide store as well.
+    cx.editor
+        .clear_diagnostics_for_language_servers(&removed_ids, None);
 
     Ok(())
 }

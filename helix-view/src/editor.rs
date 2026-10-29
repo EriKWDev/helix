@@ -1567,6 +1567,48 @@ impl Editor {
     }
 
     /// Refreshes the language server for a given document
+    /// Remove the diagnostics published by the given language server instances, from the
+    /// workspace-wide store and from open documents.
+    ///
+    /// Used when a server instance goes away (`:lsp-restart`, `:lsp-stop`) or stops serving a
+    /// document (language change): it can no longer update or retract its diagnostics itself, so
+    /// they would otherwise linger. With `only_uri` set, only that document is affected; use
+    /// `None` when the instances are gone for every document.
+    pub fn clear_diagnostics_for_language_servers(
+        &mut self,
+        ids: &[LanguageServerId],
+        only_uri: Option<&helix_core::Uri>,
+    ) {
+        if ids.is_empty() {
+            return;
+        }
+        let is_stale = |provider: &DiagnosticProvider| {
+            provider
+                .language_server_id()
+                .is_some_and(|id| ids.contains(&id))
+        };
+
+        for (uri, mut diagnostics) in std::mem::take(&mut self.diagnostics) {
+            if only_uri.is_some_and(|only| only != &uri) {
+                self.diagnostics.insert(uri, diagnostics);
+                continue;
+            }
+            diagnostics.retain(|(_, provider)| !is_stale(provider));
+            if !diagnostics.is_empty() {
+                self.diagnostics.insert(uri, diagnostics);
+            }
+        }
+
+        for doc in self.documents.values_mut() {
+            if only_uri.is_some_and(|only| doc.uri().as_ref() != Some(only)) {
+                continue;
+            }
+            for id in ids {
+                doc.clear_diagnostics_for_language_server(*id);
+            }
+        }
+    }
+
     pub fn refresh_language_servers(&mut self, doc_id: DocumentId) {
         self.launch_language_servers(doc_id)
     }
@@ -1826,14 +1868,20 @@ impl Editor {
         let language_id = doc.language_id().map(ToOwned::to_owned).unwrap_or_default();
 
         // only spawn new language servers if the servers aren't the same
-        let doc_language_servers_not_in_registry =
-            doc.language_servers.iter().filter(|(name, doc_ls)| {
+        let stale_servers: Vec<_> = doc
+            .language_servers
+            .iter()
+            .filter(|(name, doc_ls)| {
                 language_servers
                     .get(*name)
                     .is_none_or(|ls| ls.id() != doc_ls.id())
-            });
+            })
+            .map(|(_, language_server)| language_server.clone())
+            .collect();
+        let stale_ids: Vec<LanguageServerId> =
+            stale_servers.iter().map(|server| server.id()).collect();
 
-        for (_, language_server) in doc_language_servers_not_in_registry {
+        for language_server in &stale_servers {
             language_server.text_document_did_close(doc.identifier());
         }
 
@@ -1853,7 +1901,12 @@ impl Editor {
             );
         }
 
+        let uri = doc.uri();
         doc.language_servers = language_servers;
+
+        // The closed instances can no longer retract the diagnostics they published for this
+        // document, so drop them.
+        self.clear_diagnostics_for_language_servers(&stale_ids, uri.as_ref());
     }
 
     fn _refresh(&mut self) {

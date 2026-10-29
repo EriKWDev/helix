@@ -601,6 +601,11 @@ impl Registry {
         self.inner.get(id)
     }
 
+    /// The running clients of the language server with the given name, if any.
+    pub fn clients_by_name<'a>(&'a self, name: &str) -> impl Iterator<Item = &'a Arc<Client>> + 'a {
+        self.inner_by_name.get(name).into_iter().flatten()
+    }
+
     pub fn remove_by_id(&mut self, id: LanguageServerId) {
         let Some(client) = self.inner.remove(id) else {
             log::debug!("client was already removed");
