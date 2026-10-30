@@ -101,6 +101,45 @@ impl Variable {
         }
     }
 
+    /// A one-line description of the variable's value, used in the command line's help text.
+    pub const fn description(&self) -> &'static str {
+        match self {
+            Self::CursorLine => "line number of the primary cursor (1-based)",
+            Self::CursorColumn => "column of the primary cursor (1-based)",
+            Self::BufferName => "display name of the current buffer",
+            Self::FilePathAbsolute => "absolute path of the current buffer",
+            Self::LineEnding => "the buffer's line ending",
+            Self::CurrentWorkingDirectory => "current working directory",
+            Self::WorkspaceDirectory => "workspace root directory",
+            Self::Language => "the buffer's language name",
+            Self::Selection => "contents of the primary selection",
+            Self::SelectionLineStart => "first line of the primary selection (1-based)",
+            Self::SelectionLineEnd => "last line of the primary selection (1-based)",
+        }
+    }
+
+    /// Renders the table of all expansions for the command line's help text.
+    pub fn expansion_table() -> String {
+        use std::fmt::Write;
+        let mut out = String::from(
+            "\nExpansions: %<kind>{..}, e.g. %sh{cmd}; %% is a literal %,\n             a lone % is the file path. %u{25CF} is a unicode character.\n",
+        );
+        out.push_str("  %sh{cmd}  shell command output\n");
+        out.push_str("  %reg{r}   register contents\n");
+        out.push_str("  %q{name}  variable, quoted for the shell; %q is the quoted selection\n");
+        for var in Self::VARIANTS {
+            writeln!(
+                out,
+                "  %{short}  %{name:<22} {description}",
+                short = var.short_name(),
+                name = var.as_str(),
+                description = var.description(),
+            )
+            .unwrap();
+        }
+        out
+    }
+
     pub fn from_name(s: &str) -> Option<Self> {
         let mut chars = s.chars();
         if let (Some(c), None) = (chars.next(), chars.next()) {
@@ -181,6 +220,18 @@ fn shell_quote(editor: &Editor, s: &str) -> String {
     let config = editor.config();
     let program = config.shell.first().map_or("sh", String::as_str);
     ShellKind::detect(program).quote(s)
+}
+
+/// The expansion help appended to the help text of shell commands (`:sh`, `/`, pipes, `%sh{}`).
+///
+/// `doc` is the command's own description, if any.
+pub fn shell_command_doc(doc: &str) -> String {
+    let mut out = String::new();
+    if !doc.is_empty() {
+        out.push_str(doc);
+    }
+    out.push_str(&Variable::expansion_table());
+    out
 }
 
 /// Expand a shell command.

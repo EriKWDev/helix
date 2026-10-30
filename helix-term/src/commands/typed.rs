@@ -22,6 +22,8 @@ pub struct TypableCommand {
     pub name: &'static str,
     pub aliases: &'static [&'static str],
     pub doc: &'static str,
+    /// Whether the command runs a shell command, so its help text lists the `%` expansions.
+    pub shell: bool,
     // params, flags, helper, completer
     pub fun: fn(&mut compositor::Context, Args, PromptEvent) -> anyhow::Result<()>,
     /// What completion methods, if any, does this command have?
@@ -3102,6 +3104,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "hot",
         aliases: &[],
         doc: "Toggle unsaved-buffer hot compilation. Default socket: out/hot-edit.sock. Use :hot <socket> to enable a specific socket, :hot off to disable, or :hot status to inspect the connection.",
+        shell: false,
         fun: hot,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -3113,6 +3116,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "exit",
         aliases: &["x", "xit"],
         doc: "Write changes to disk if the buffer is modified and then quit. Accepts an optional path (:exit some/path.txt).",
+        shell: false,
         fun: exit,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -3125,6 +3129,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "exit!",
         aliases: &["x!", "xit!"],
         doc: "Force write changes to disk, creating necessary subdirectories, if the buffer is modified and then quit. Accepts an optional path (:exit! some/path.txt).",
+        shell: false,
         fun: force_exit,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -3137,6 +3142,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "quit",
         aliases: &["q"],
         doc: "Close the current view.",
+        shell: false,
         fun: quit,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3148,6 +3154,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "quit!",
         aliases: &["q!"],
         doc: "Force close the current view, ignoring unsaved changes.",
+        shell: false,
         fun: force_quit,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3159,6 +3166,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "open",
         aliases: &["o", "edit", "e"],
         doc: "Open a file from disk into the current view.",
+        shell: false,
         fun: open,
         completer: CommandCompleter::all(completers::filename),
         signature: Signature {
@@ -3170,6 +3178,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "buffer-close",
         aliases: &["bc", "bclose"],
         doc: "Close the current buffer.",
+        shell: false,
         fun: buffer_close,
         completer: CommandCompleter::all(completers::buffer),
         signature: Signature {
@@ -3181,6 +3190,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "buffer-close!",
         aliases: &["bc!", "bclose!"],
         doc: "Close the current buffer forcefully, ignoring unsaved changes.",
+        shell: false,
         fun: force_buffer_close,
         completer: CommandCompleter::all(completers::buffer),
         signature: Signature {
@@ -3192,6 +3202,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "buffer-close-others",
         aliases: &["bco", "bcloseother"],
         doc: "Close all buffers but the currently focused one.",
+        shell: false,
         fun: buffer_close_others,
         completer: CommandCompleter::none(),
         signature: BUFFER_CLOSE_OTHERS_SIGNATURE,
@@ -3200,6 +3211,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "buffer-close-others!",
         aliases: &["bco!", "bcloseother!"],
         doc: "Force close all buffers but the currently focused one.",
+        shell: false,
         fun: force_buffer_close_others,
         completer: CommandCompleter::none(),
         signature: BUFFER_CLOSE_OTHERS_SIGNATURE,
@@ -3208,6 +3220,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "buffer-close-all",
         aliases: &["bca", "bcloseall"],
         doc: "Close all buffers without quitting.",
+        shell: false,
         fun: buffer_close_all,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3219,6 +3232,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "buffer-close-all!",
         aliases: &["bca!", "bcloseall!"],
         doc: "Force close all buffers ignoring unsaved changes without quitting.",
+        shell: false,
         fun: force_buffer_close_all,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3230,6 +3244,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "buffer-next",
         aliases: &["bn", "bnext"],
         doc: "Goto next buffer.",
+        shell: false,
         fun: buffer_next,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3241,6 +3256,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "buffer-previous",
         aliases: &["bp", "bprev"],
         doc: "Goto previous buffer.",
+        shell: false,
         fun: buffer_previous,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3252,6 +3268,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "write",
         aliases: &["w"],
         doc: "Write changes to disk. Accepts an optional path (:write some/path.txt)",
+        shell: false,
         fun: write,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -3264,6 +3281,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "write!",
         aliases: &["w!"],
         doc: "Force write changes to disk creating necessary subdirectories. Accepts an optional path (:write! some/path.txt)",
+        shell: false,
         fun: force_write,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -3276,6 +3294,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "write-buffer-close",
         aliases: &["wbc"],
         doc: "Write changes to disk and closes the buffer. Accepts an optional path (:write-buffer-close some/path.txt)",
+        shell: false,
         fun: write_buffer_close,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -3288,6 +3307,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "write-buffer-close!",
         aliases: &["wbc!"],
         doc: "Force write changes to disk creating necessary subdirectories and closes the buffer. Accepts an optional path (:write-buffer-close! some/path.txt)",
+        shell: false,
         fun: force_write_buffer_close,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -3300,6 +3320,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "new",
         aliases: &["n"],
         doc: "Create a new scratch buffer.",
+        shell: false,
         fun: new_file,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3311,6 +3332,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "format",
         aliases: &["fmt"],
         doc: "Format the file using an external formatter or language server.",
+        shell: false,
         fun: format,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3322,6 +3344,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "indent-style",
         aliases: &[],
         doc: "Set the indentation style for editing. ('t' for tabs or 1-16 for number of spaces.)",
+        shell: false,
         fun: set_indent_style,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3334,8 +3357,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         aliases: &[],
         #[cfg(not(feature = "unicode-lines"))]
         doc: "Set the document's default line ending. Options: crlf, lf.",
-        #[cfg(feature = "unicode-lines")]
-        doc: "Set the document's default line ending. Options: crlf, lf, cr, ff, nel.",
+        shell: false,
         fun: set_line_ending,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3347,6 +3369,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "earlier",
         aliases: &["ear"],
         doc: "Jump back to an earlier point in edit history. Accepts a number of steps or a time span.",
+        shell: false,
         fun: earlier,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3358,6 +3381,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "later",
         aliases: &["lat"],
         doc: "Jump to a later point in edit history. Accepts a number of steps or a time span.",
+        shell: false,
         fun: later,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3369,6 +3393,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "write-quit",
         aliases: &["wq"],
         doc: "Write changes to disk and close the current view. Accepts an optional path (:wq some/path.txt)",
+        shell: false,
         fun: write_quit,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -3381,6 +3406,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "write-quit!",
         aliases: &["wq!"],
         doc: "Write changes to disk and close the current view forcefully. Accepts an optional path (:wq! some/path.txt)",
+        shell: false,
         fun: force_write_quit,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -3393,6 +3419,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "write-all",
         aliases: &["wa"],
         doc: "Write changes from all buffers to disk.",
+        shell: false,
         fun: write_all,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3405,6 +3432,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "write-all!",
         aliases: &["wa!"],
         doc: "Forcefully write changes from all buffers to disk creating necessary subdirectories.",
+        shell: false,
         fun: force_write_all,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3417,6 +3445,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "write-quit-all",
         aliases: &["wqa", "xa"],
         doc: "Write changes from all buffers to disk and close all views.",
+        shell: false,
         fun: write_all_quit,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3429,6 +3458,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "write-quit-all!",
         aliases: &["wqa!", "xa!"],
         doc: "Forcefully write changes from all buffers to disk, creating necessary subdirectories, and close all views (ignoring unsaved changes).",
+        shell: false,
         fun: force_write_all_quit,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3441,6 +3471,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "quit-all",
         aliases: &["qa"],
         doc: "Close all views.",
+        shell: false,
         fun: quit_all,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3452,6 +3483,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "quit-all!",
         aliases: &["qa!"],
         doc: "Force close all views ignoring unsaved changes.",
+        shell: false,
         fun: force_quit_all,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3463,6 +3495,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "cquit",
         aliases: &["cq"],
         doc: "Quit with exit code (default 1). Accepts an optional integer exit code (:cq 2).",
+        shell: false,
         fun: cquit,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3474,6 +3507,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "cquit!",
         aliases: &["cq!"],
         doc: "Force quit with exit code (default 1) ignoring unsaved changes. Accepts an optional integer exit code (:cq! 2).",
+        shell: false,
         fun: force_cquit,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3485,6 +3519,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "theme",
         aliases: &[],
         doc: "Change the editor theme (show current theme if no name specified).",
+        shell: false,
         fun: theme,
         completer: CommandCompleter::positional(&[completers::theme]),
         signature: Signature {
@@ -3496,6 +3531,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "yank-join",
         aliases: &[],
         doc: "Yank joined selections. A separator can be provided as first argument. Default value is newline.",
+        shell: false,
         fun: yank_joined,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3507,6 +3543,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "clipboard-yank",
         aliases: &[],
         doc: "Yank main selection into system clipboard.",
+        shell: false,
         fun: yank_main_selection_to_clipboard,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3518,6 +3555,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "clipboard-yank-join",
         aliases: &[],
         doc: "Yank joined selections into system clipboard. A separator can be provided as first argument. Default value is newline.", // FIXME: current UI can't display long doc.
+        shell: false,
         fun: yank_joined_to_clipboard,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3529,6 +3567,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "primary-clipboard-yank",
         aliases: &[],
         doc: "Yank main selection into system primary clipboard.",
+        shell: false,
         fun: yank_main_selection_to_primary_clipboard,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3540,6 +3579,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "primary-clipboard-yank-join",
         aliases: &[],
         doc: "Yank joined selections into system primary clipboard. A separator can be provided as first argument. Default value is newline.", // FIXME: current UI can't display long doc.
+        shell: false,
         fun: yank_joined_to_primary_clipboard,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3551,6 +3591,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "clipboard-paste-after",
         aliases: &[],
         doc: "Paste system clipboard after selections.",
+        shell: false,
         fun: paste_clipboard_after,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3562,6 +3603,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "clipboard-paste-before",
         aliases: &[],
         doc: "Paste system clipboard before selections.",
+        shell: false,
         fun: paste_clipboard_before,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3573,6 +3615,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "clipboard-paste-replace",
         aliases: &[],
         doc: "Replace selections with content of system clipboard.",
+        shell: false,
         fun: replace_selections_with_clipboard,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3584,6 +3627,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "primary-clipboard-paste-after",
         aliases: &[],
         doc: "Paste primary clipboard after selections.",
+        shell: false,
         fun: paste_primary_clipboard_after,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3595,6 +3639,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "primary-clipboard-paste-before",
         aliases: &[],
         doc: "Paste primary clipboard before selections.",
+        shell: false,
         fun: paste_primary_clipboard_before,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3606,6 +3651,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "primary-clipboard-paste-replace",
         aliases: &[],
         doc: "Replace selections with content of system primary clipboard.",
+        shell: false,
         fun: replace_selections_with_primary_clipboard,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3617,6 +3663,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "show-clipboard-provider",
         aliases: &[],
         doc: "Show clipboard provider name in status bar.",
+        shell: false,
         fun: show_clipboard_provider,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3628,6 +3675,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "change-current-directory",
         aliases: &["cd"],
         doc: "Change the current working directory.",
+        shell: false,
         fun: change_current_directory,
         completer: CommandCompleter::positional(&[completers::directory]),
         signature: Signature {
@@ -3639,6 +3687,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "show-directory-stack",
         aliases: &[],
         doc: "Show the directory stack as a <space> delimited string.",
+        shell: false,
         fun: show_directory_stack,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3650,6 +3699,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "push-directory",
         aliases: &["pushd"],
         doc: "Save and then change the current directory.",
+        shell: false,
         fun: push_directory,
         completer: CommandCompleter::positional(&[completers::directory]),
         signature: Signature {
@@ -3661,6 +3711,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "pop-directory",
         aliases: &["popd"],
         doc: "Remove the top entry from the directory stack, and cd to the new top directory..",
+        shell: false,
         fun: pop_directory,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3672,6 +3723,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "show-directory",
         aliases: &["pwd"],
         doc: "Show the current working directory.",
+        shell: false,
         fun: show_current_directory,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3683,6 +3735,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "encoding",
         aliases: &[],
         doc: "Set encoding. Based on `https://encoding.spec.whatwg.org`.",
+        shell: false,
         fun: set_encoding,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3694,6 +3747,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "character-info",
         aliases: &["char"],
         doc: "Get info about the character under the primary cursor.",
+        shell: false,
         fun: get_character_info,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3705,6 +3759,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "reload",
         aliases: &["rl"],
         doc: "Discard changes and reload from the source file.",
+        shell: false,
         fun: reload,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3716,6 +3771,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "reload-all",
         aliases: &["rla"],
         doc: "Discard changes and reload all documents from the source files.",
+        shell: false,
         fun: reload_all,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3727,6 +3783,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "update",
         aliases: &["u"],
         doc: "Write changes only if the file has been modified.",
+        shell: false,
         fun: update,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3739,6 +3796,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "lsp-workspace-command",
         aliases: &[],
         doc: "Open workspace command picker",
+        shell: false,
         fun: lsp_workspace_command,
         completer: CommandCompleter::positional(&[completers::lsp_workspace_command]),
         signature: Signature {
@@ -3751,6 +3809,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "lsp-restart",
         aliases: &[],
         doc: "Restarts the given language servers, or all language servers that are used by the current file if no arguments are supplied",
+        shell: false,
         fun: lsp_restart,
         completer: CommandCompleter::all(completers::configured_language_servers),
         signature: Signature {
@@ -3762,6 +3821,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "lsp-stop",
         aliases: &[],
         doc: "Stops the given language servers, or all language servers that are used by the current file if no arguments are supplied",
+        shell: false,
         fun: lsp_stop,
         completer: CommandCompleter::all(completers::active_language_servers),
         signature: Signature {
@@ -3773,6 +3833,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "tree-sitter-scopes",
         aliases: &[],
         doc: "Display tree sitter scopes, primarily for theming and development.",
+        shell: false,
         fun: tree_sitter_scopes,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3784,6 +3845,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "tree-sitter-highlight-name",
         aliases: &[],
         doc: "Display name of tree-sitter highlight scope under the cursor.",
+        shell: false,
         fun: tree_sitter_highlight_name,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3795,6 +3857,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "tree-sitter-layers",
         aliases: &[],
         doc: "Display language names of tree-sitter injection layers under the cursor.",
+        shell: false,
         fun: tree_sitter_layers,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3806,6 +3869,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "debug-start",
         aliases: &["dbg"],
         doc: "Start a debug session from a given template with given parameters.",
+        shell: false,
         fun: debug_start,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3817,6 +3881,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "debug-remote",
         aliases: &["dbg-tcp"],
         doc: "Connect to a debug adapter by TCP address and start a debugging session from a given template with given parameters.",
+        shell: false,
         fun: debug_remote,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3828,6 +3893,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "debug-eval",
         aliases: &[],
         doc: "Evaluate expression in current debug context.",
+        shell: false,
         fun: debug_eval,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3839,6 +3905,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "vsplit",
         aliases: &["vs"],
         doc: "Open the file in a vertical split.",
+        shell: false,
         fun: vsplit,
         completer: CommandCompleter::all(completers::filename),
         signature: Signature {
@@ -3850,6 +3917,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "vsplit-new",
         aliases: &["vnew"],
         doc: "Open a scratch buffer in a vertical split.",
+        shell: false,
         fun: vsplit_new,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3861,6 +3929,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "hsplit",
         aliases: &["hs", "sp"],
         doc: "Open the file in a horizontal split.",
+        shell: false,
         fun: hsplit,
         completer: CommandCompleter::all(completers::filename),
         signature: Signature {
@@ -3872,6 +3941,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "hsplit-new",
         aliases: &["hnew"],
         doc: "Open a scratch buffer in a horizontal split.",
+        shell: false,
         fun: hsplit_new,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3883,6 +3953,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "tutor",
         aliases: &[],
         doc: "Open the tutorial.",
+        shell: false,
         fun: tutor,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3894,6 +3965,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "goto",
         aliases: &["g"],
         doc: "Goto line number.",
+        shell: false,
         fun: goto_line_number,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3905,6 +3977,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "set-language",
         aliases: &["lang"],
         doc: "Set the language of current buffer (show current language if no value specified).",
+        shell: false,
         fun: language,
         completer: CommandCompleter::positional(&[completers::language]),
         signature: Signature {
@@ -3916,6 +3989,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "set-option",
         aliases: &["set"],
         doc: "Set a config option at runtime.\nFor example to disable smart case search, use `:set search.smart-case false`.",
+        shell: false,
         fun: set_option,
         // TODO: Add support for completion of the options value(s), when appropriate.
         completer: CommandCompleter::positional(&[completers::setting]),
@@ -3929,6 +4003,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "toggle-option",
         aliases: &["toggle"],
         doc: "Toggle a config option at runtime.\nFor example to toggle smart case search, use `:toggle search.smart-case`.",
+        shell: false,
         fun: toggle_option,
         completer: CommandCompleter::positional(&[completers::setting]),
         signature: Signature {
@@ -3941,6 +4016,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "get-option",
         aliases: &["get"],
         doc: "Get the current value of a config option.",
+        shell: false,
         fun: get_option,
         completer: CommandCompleter::positional(&[completers::setting]),
         signature: Signature {
@@ -3952,6 +4028,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "sort",
         aliases: &[],
         doc: "Sort ranges in selection.",
+        shell: false,
         fun: sort,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3977,6 +4054,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "reflow",
         aliases: &[],
         doc: "Hard-wrap the current selection of lines to a given width.",
+        shell: false,
         fun: reflow,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3988,6 +4066,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "tree-sitter-subtree",
         aliases: &["ts-subtree"],
         doc: "Display the smallest tree-sitter subtree that spans the primary selection, primarily for debugging queries.",
+        shell: false,
         fun: tree_sitter_subtree,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -3999,6 +4078,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "config-reload",
         aliases: &[],
         doc: "Refresh user config.",
+        shell: false,
         fun: refresh_config,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -4010,6 +4090,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "config-open",
         aliases: &[],
         doc: "Open the user config.toml file.",
+        shell: false,
         fun: open_config,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -4021,6 +4102,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "config-open-workspace",
         aliases: &[],
         doc: "Open the workspace config.toml file.",
+        shell: false,
         fun: open_workspace_config,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -4032,6 +4114,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "log-open",
         aliases: &[],
         doc: "Open the helix log file.",
+        shell: false,
         fun: open_log,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -4046,6 +4129,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         fun: insert_output,
         completer: SHELL_COMPLETER,
         signature: SHELL_SIGNATURE,
+        shell: true,
     },
     TypableCommand {
         name: "append-output",
@@ -4054,6 +4138,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         fun: append_output,
         completer: SHELL_COMPLETER,
         signature: SHELL_SIGNATURE,
+        shell: true,
     },
     TypableCommand {
         name: "pipe",
@@ -4062,6 +4147,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         fun: pipe,
         completer: SHELL_COMPLETER,
         signature: SHELL_SIGNATURE,
+        shell: true,
     },
     TypableCommand {
         name: "pipe-to",
@@ -4070,19 +4156,22 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         fun: pipe_to,
         completer: SHELL_COMPLETER,
         signature: SHELL_SIGNATURE,
+        shell: true,
     },
     TypableCommand {
         name: "run-shell-command",
         aliases: &["sh", "!", "/"],
-        doc: "Run a shell command",
+        doc: "Run a shell command. `%` expansions (like `%f` for the file path) are replaced before running.",
         fun: run_shell_command,
         completer: SHELL_COMPLETER,
         signature: SHELL_SIGNATURE,
+        shell: true,
     },
     TypableCommand {
         name: "set-run-command",
         aliases: &["sr"],
         doc: "Set the shell command that `:run` uses to compile and run the current project, for this session. Expansions like `%f` are evaluated when it runs. Without arguments, edit the current one; `--clear` goes back to editor.run-commands.",
+        shell: false,
         fun: set_run_command,
         completer: SHELL_COMPLETER,
         signature: Signature {
@@ -4096,6 +4185,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "run",
         aliases: &["cr", "compile-and-run"],
         doc: "Compile and run the current project with the command from `:set-run-command`, or from editor.run-commands for the file's extension or language.",
+        shell: false,
         fun: compile_and_run,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -4107,6 +4197,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "reset-diff-change",
         aliases: &["diffget", "diffg"],
         doc: "Reset the diff change at the cursor position.",
+        shell: false,
         fun: reset_diff_change,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -4118,6 +4209,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "clear-register",
         aliases: &[],
         doc: "Clear given register. If no argument is provided, clear all registers.",
+        shell: false,
         fun: clear_register,
         completer: CommandCompleter::all(completers::register),
         signature: Signature {
@@ -4129,6 +4221,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "set-register",
         aliases: &[],
         doc: "Set contents of the given register.",
+        shell: false,
         fun: set_register,
         completer: CommandCompleter::positional(&[completers::register, completers::none]),
         signature: Signature {
@@ -4141,6 +4234,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "redraw",
         aliases: &[],
         doc: "Clear and re-render the whole UI",
+        shell: false,
         fun: redraw,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -4152,6 +4246,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "move",
         aliases: &["mv"],
         doc: "Move the current buffer and its corresponding file to a different path",
+        shell: false,
         fun: move_buffer,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -4163,6 +4258,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "move!",
         aliases: &["mv!"],
         doc: "Move the current buffer and its corresponding file to a different path creating necessary subdirectories",
+        shell: false,
         fun: force_move_buffer,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -4174,6 +4270,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "yank-diagnostic",
         aliases: &[],
         doc: "Yank diagnostic(s) under primary cursor to register, or clipboard by default",
+        shell: false,
         fun: yank_diagnostic,
         completer: CommandCompleter::all(completers::register),
         signature: Signature {
@@ -4185,6 +4282,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "read",
         aliases: &["r"],
         doc: "Load a file into buffer",
+        shell: false,
         fun: read,
         completer: CommandCompleter::positional(&[completers::filename]),
         signature: Signature {
@@ -4196,6 +4294,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "echo",
         aliases: &[],
         doc: "Prints the given arguments to the statusline.",
+        shell: false,
         fun: echo,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -4207,6 +4306,7 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         name: "noop",
         aliases: &[],
         doc: "Does nothing.",
+        shell: false,
         fun: noop,
         completer: CommandCompleter::none(),
         signature: Signature {
@@ -4300,6 +4400,10 @@ fn command_line_prompt() -> Prompt {
 fn command_line_doc(input: &str) -> Option<Cow<'_, str>> {
     let (command, _, _) = command_line::split(input);
     let command = TYPABLE_COMMAND_MAP.get(command)?;
+
+    if command.shell {
+        return Some(Cow::Owned(expansion::shell_command_doc(command.doc)));
+    }
 
     if command.aliases.is_empty() && command.signature.flags.is_empty() {
         return Some(Cow::Borrowed(command.doc));
